@@ -7,7 +7,8 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { OpenAI } from 'openai';
+import { GoogleGenAI } from "@google/genai"; //we are gonna use this package, this is new package do not change
+import { OpenAI } from "openai"; 
 import axios from 'axios';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs'; // Import fs for file reading
@@ -19,14 +20,15 @@ import * as mime from 'mime-types'; // Revert to import statement
 dotenv.config();
 
 // Get OpenAI API key from environment variables
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) {
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
   throw new Error('OPENAI_API_KEY environment variable is required');
 }
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
+  apiKey: GEMINI_API_KEY,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
 // --- Argument Type Guards ---
@@ -220,7 +222,7 @@ class ImageAnalysisServer {
       }
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gemini-2.0-flash',
         messages: [
           {
             role: 'system',

@@ -42,10 +42,10 @@ npm run build
 
 ## Configuration
 
-To use this server, you need an OpenAI API key. Set the following environment variable:
+To use this server, you need an Gemini API key. Set the following environment variable:
 
 ```
-OPENAI_API_KEY=your_openai_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ## MCP Server Configuration
@@ -63,7 +63,7 @@ Add the following to `cline_mcp_settings.json`:
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
-        "OPENAI_API_KEY": "your_openai_api_key"
+        "GEMINI_API_KEY": "your_gemini_api_key"
       }
     }
   }
@@ -81,7 +81,7 @@ Add the following to `claude_desktop_config.json`:
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
-        "OPENAI_API_KEY": "your_openai_api_key"
+        "GEMINI_API_KEY": "your_gemini_api_key"
       }
     }
   }
