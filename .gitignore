@@ -18,3 +18,8 @@ dist/
 # OS固有のファイル
 .DS_Store
 Thumbs.db
+Pottery.mp4
+test-image.png
+test-image2.jpg
+test-video.mp4
+test-video2.mov

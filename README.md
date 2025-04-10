@@ -1,37 +1,39 @@
-# image-mcp-server
 
-[日本語の README](README.ja.md)
+# image-mcp-server-gemini
 
-<a href="https://glama.ai/mcp/servers/@champierre/image-mcp-server">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@champierre/image-mcp-server/badge" alt="Image Analysis MCP Server" />
-</a>
 
-[![smithery badge](https://smithery.ai/badge/@champierre/image-mcp-server)](https://smithery.ai/server/@champierre/image-mcp-server)
-An MCP server that receives image URLs or local file paths and analyzes image content using the Flash 2.0 model.
+
+
+[![smithery badge](https://smithery.ai/badge/@Rentapad/image-mcp-server-gemini)](https://smithery.ai/server/@Rentapad/image-mcp-server-gemini)
+An MCP server that receives image/video URLs or local file paths and analyzes their content using the Gemini 2.0 Flash model.(forked from github.com/champierre/image-mcp-server)
 
 ## Features
 
-- Receives image URLs or local file paths as input and provides detailed analysis of the image content
-- High-precision image recognition and description using the Flash 2.0 model
-- Image URL validity checking
-- Image loading from local files and Base64 encoding
+- Analyzes content from one or more image/video URLs or local file paths.
+- Analyzes videos directly from YouTube URLs.
+- Can analyze relationships between multiple images or videos provided together.
+- Supports optional text prompts to guide the analysis.
+- High-precision recognition and description using the Gemini 2.0 Flash model.
+- URL validity checking and local file loading with Base64 encoding.
+- Basic security checks for local file paths.
+- Handles various image and video MIME types (see Usage section for details).
 
 ## Installation
 
 ### Installing via Smithery
 
-To install Image Analysis Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@champierre/image-mcp-server):
+To install Image Analysis Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@Rentapad/image-mcp-server-gemini):
 
 ```bash
-npx -y @smithery/cli install @champierre/image-mcp-server --client claude
+npx -y @smithery/cli install @Rentapad/image-mcp-server --client claude
 ```
 
 ### Manual Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/champierre/image-mcp-server.git # or your forked repository
-cd image-mcp-server
+git clone https://github.com/Rentapad/image-mcp-server-gemini.git 
+cd image-mcp-server-gemini
 
 # Install dependencies
 npm install
@@ -42,7 +44,7 @@ npm run build
 
 ## Configuration
 
-To use this server, you need an Gemini API key. Set the following environment variable:
+To use this server, you need a Gemini API key. Set the following environment variable:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key
@@ -59,7 +61,7 @@ Add the following to `cline_mcp_settings.json`:
 ```json
 {
   "mcpServers": {
-    "image-analysis": {
+    "image-video-analysis": { // Consider renaming for clarity
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
@@ -77,7 +79,7 @@ Add the following to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "image-analysis": {
+    "image-video-analysis": { // Consider renaming for clarity
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
@@ -92,26 +94,50 @@ Add the following to `claude_desktop_config.json`:
 
 Once the MCP server is configured, the following tools become available:
 
-- `analyze_image`: Receives an image URL and analyzes its content.
-- `analyze_image_from_path`: Receives a local file path and analyzes its content.
+- `analyze_image`: Receives one or more image URLs and analyzes their content.
+  - Arguments: `imageUrls` (array of strings, required), `prompt` (string, optional).
+- `analyze_image_from_path`: Receives one or more local image file paths and analyzes their content.
+  - Arguments: `imagePaths` (array of strings, required), `prompt` (string, optional).
+- `analyze_video`: Receives one or more video URLs and analyzes their content. Best for smaller videos (see Video Notes).
+  - Arguments: `videoUrls` (array of strings, required), `prompt` (string, optional).
+- `analyze_video_from_path`: Receives one or more local video file paths and analyzes their content. Best for smaller videos (see Video Notes).
+  - Arguments: `videoPaths` (array of strings, required), `prompt` (string, optional).
+- `analyze_youtube_video`: Receives a single YouTube video URL and analyzes its content.
+  - Arguments: `youtubeUrl` (string, required), `prompt` (string, optional).
 
 ### Usage Examples
 
-**Analyzing from URL:**
+**Analyzing a single image from URL:**
+```
+Please analyze this image: https://example.com/image.jpg
+```
 
+**Analyzing multiple images from local paths and comparing them:**
 ```
-Please analyze this image URL: https://example.com/image.jpg
+Analyze these images: /path/to/your/image1.png, /path/to/your/image2.jpeg. Which one contains a cat?
 ```
+*(The client would call `analyze_image_from_path` with `imagePaths: ["/path/to/your/image1.png", "/path/to/your/image2.jpeg"]` and `prompt: "Which one contains a cat?"`)*
 
-**Analyzing from local file path:**
+**Analyzing a video from URL with a specific prompt:**
+```
+Summarize the content of this video: https://example.com/video.mp4
+```
+*(The client would call `analyze_video` with `videoUrls: ["https://example.com/video.mp4"]` and `prompt: "Summarize the content of this video"`)*
 
+**Analyzing a YouTube video:**
 ```
-Please analyze this image: /path/to/your/image.jpg
+What is the main topic of this YouTube video? https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
+*(The client would call `analyze_youtube_video` with `youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"` and `prompt: "What is the main topic of this YouTube video?"`)*
+
+### Video Notes
+
+- **Size Limit:** For videos provided via URL (`analyze_video`) or path (`analyze_video_from_path`), Gemini currently has limitations on the size of video data that can be processed directly (typically around 20MB after Base64 encoding). Larger videos may fail. YouTube analysis does not have this same client-side download limit.
+- **Supported MIME Types:** The server attempts to map and use MIME types supported by Gemini for video. Officially supported types include: `video/mp4`, `video/mpeg`, `video/mov`, `video/avi`, `video/x-flv`, `video/mpg`, `video/webm`, `video/wmv`, `video/3gpp`. Files with other MIME types might be skipped. YouTube videos are handled separately.
 
 ### Note: Specifying Local File Paths
 
-When using the `analyze_image_from_path` tool, the AI assistant (client) must specify a **valid file path in the environment where this server is running**.
+When using the `..._from_path` tools, the AI assistant (client) must specify **valid file paths in the environment where this server is running**.
 
 - **If the server is running on WSL:**
   - If the AI assistant has a Windows path (e.g., `C:\...`), it needs to convert it to a WSL path (e.g., `/mnt/c/...`) before passing it to the tool.
@@ -120,7 +146,7 @@ When using the `analyze_image_from_path` tool, the AI assistant (client) must sp
   - If the AI assistant has a WSL path (e.g., `/home/user/...`), it needs to convert it to a UNC path (e.g., `\\wsl$\Distro\...`) before passing it to the tool.
   - If the AI assistant has a Windows path, it can pass it as is.
 
-**Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is.
+**Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is, applying basic security checks.
 
 ### Note: Type Errors During Build
 
@@ -148,3 +174,4 @@ npm run dev
 ## License
 
 MIT
+```
