@@ -7,7 +7,6 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { GoogleGenAI } from "@google/genai"; //we are gonna use this package, this is new package do not change
 import { OpenAI } from "openai"; 
 import axios from 'axios';
 import * as dotenv from 'dotenv';
@@ -208,18 +207,50 @@ class ImageAnalysisServer {
     }
   }
 
-  // Method to analyze images with Flash 2.0 (modified: accepts URL or Base64)
+  // Method to analyze images with Flash 2.0 (modified: fetches URL, handles Base64)
   private async analyzeImageWithGemini(
      imageData: { type: 'url', data: string } | { type: 'base64', data: string, mimeType: string }
    ): Promise<string> {
     try {
       let imageInput: any;
+      let finalMimeType: string;
+      let base64String: string;
+
       if (imageData.type === 'url') {
-        imageInput = { type: 'image_url', image_url: { url: imageData.data } };
+        // Fetch image from URL, convert to base64, determine MIME type
+        console.log(`Fetching image from URL: ${imageData.data}`);
+        // Add explicit error handling for the axios request
+        let fetchResponse;
+        try {
+            fetchResponse = await axios.get(imageData.data, { responseType: 'arraybuffer' });
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                 throw new Error(`Failed to fetch image URL: ${error.message} (Status: ${error.response?.status})`);
+            }
+            throw new Error(`Failed to fetch image URL: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        base64String = Buffer.from(fetchResponse.data, 'binary').toString('base64');
+        // Prioritize content-type header, fallback to mime.lookup or default
+        finalMimeType = fetchResponse.headers['content-type']?.split(';')[0] || mime.lookup(imageData.data) || 'application/octet-stream';
+
+        if (!finalMimeType.startsWith('image/')) {
+          throw new Error(`Fetched content is not an image: ${finalMimeType}`);
+        }
+        console.log(`Analyzing fetched image from URL (MIME: ${finalMimeType})...`);
       } else {
-        // Construct data URI for OpenAI API
-        imageInput = { type: 'image_url', image_url: { url: `data:${imageData.mimeType};base64,${imageData.data}` } };
+        // Use provided base64 data and mimeType
+        console.log(`Analyzing image from provided base64 data (MIME: ${imageData.mimeType})...`);
+        base64String = imageData.data;
+        finalMimeType = imageData.mimeType;
+         // Add a check for base64 data as well
+        if (!finalMimeType.startsWith('image/')) {
+             throw new Error(`Provided data is not an image: ${finalMimeType}`);
+        }
       }
+
+      // Construct data URI for OpenAI API compatibility layer
+      imageInput = { type: 'image_url', image_url: { url: `data:${finalMimeType};base64,${base64String}` } };
 
       const response = await openai.chat.completions.create({
         model: 'gemini-2.0-flash',
@@ -236,13 +267,15 @@ class ImageAnalysisServer {
             ],
           },
         ],
-        max_tokens: 1000,
+        max_tokens: 1000, // Keep original token limit
       });
 
       return response.choices[0]?.message?.content || 'Could not retrieve analysis results.';
     } catch (error) {
-      console.error('OpenAI API error:', error);
-      throw new Error(`OpenAI API error: ${error instanceof Error ? error.message : String(error)}`);
+      // Log the specific type of error if possible
+      console.error(`Error during Gemini analysis (Input type: ${imageData.type}):`, error);
+      // Re-throw a more informative error message
+      throw new Error(`Gemini API analysis error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
