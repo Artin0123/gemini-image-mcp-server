@@ -5,6 +5,7 @@ package-lock.json
 # ビルド出力
 dist/
 .specstory/
+
 # 環境変数
 .env
 
