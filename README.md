@@ -7,12 +7,12 @@
 </a>
 
 [![smithery badge](https://smithery.ai/badge/@champierre/image-mcp-server)](https://smithery.ai/server/@champierre/image-mcp-server)
-An MCP server that receives image URLs or local file paths and analyzes image content using the GPT-4o-mini model.
+An MCP server that receives image URLs or local file paths and analyzes image content using the Flash 2.0 model.
 
 ## Features
 
 - Receives image URLs or local file paths as input and provides detailed analysis of the image content
-- High-precision image recognition and description using the GPT-4o-mini model
+- High-precision image recognition and description using the Flash 2.0 model
 - Image URL validity checking
 - Image loading from local files and Base64 encoding
 

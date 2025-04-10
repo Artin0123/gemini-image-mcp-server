@@ -79,7 +79,7 @@ class ImageAnalysisServer {
       tools: [
         {
           name: 'analyze_image',
-          description: 'Receives an image URL and analyzes the image content using GPT-4o-mini',
+          description: 'Receives an image URL and analyzes the image content using Flash 2.0',
           inputSchema: {
             type: 'object',
             properties: {
@@ -94,7 +94,7 @@ class ImageAnalysisServer {
         // --- New Tool Definition ---
         {
           name: 'analyze_image_from_path',
-          description: 'Loads an image from a local file path and analyzes its content using GPT-4o-mini. AI assistants need to provide a valid path for the server execution environment (e.g., Linux path if the server is running on WSL).',
+          description: 'Loads an image from a local file path and analyzes its content using Flash 2.0. AI assistants need to provide a valid path for the server execution environment (e.g., Linux path if the server is running on WSL).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -127,7 +127,7 @@ class ImageAnalysisServer {
           }
           const imageUrl = args.imageUrl;
           await this.validateImageUrl(imageUrl); // Validate URL accessibility
-          analysis = await this.analyzeImageWithGpt4({ type: 'url', data: imageUrl });
+          analysis = await this.analyzeImageWithGemini({ type: 'url', data: imageUrl });
 
         } else if (toolName === 'analyze_image_from_path') {
           if (!isValidAnalyzeImagePathArgs(args)) {
@@ -157,7 +157,7 @@ class ImageAnalysisServer {
              throw new McpError(ErrorCode.InvalidParams, `File is not an image: ${mimeType}`);
           }
 
-          analysis = await this.analyzeImageWithGpt4({ type: 'base64', data: base64String, mimeType: mimeType });
+          analysis = await this.analyzeImageWithGemini({ type: 'base64', data: base64String, mimeType: mimeType });
 
         } else {
           throw new McpError(
@@ -208,8 +208,8 @@ class ImageAnalysisServer {
     }
   }
 
-  // Method to analyze images with GPT-4o-mini (modified: accepts URL or Base64)
-  private async analyzeImageWithGpt4(
+  // Method to analyze images with Flash 2.0 (modified: accepts URL or Base64)
+  private async analyzeImageWithGemini(
      imageData: { type: 'url', data: string } | { type: 'base64', data: string, mimeType: string }
    ): Promise<string> {
     try {
