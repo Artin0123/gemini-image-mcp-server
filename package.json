@@ -24,6 +24,7 @@
   "homepage": "https://github.com/champierre/image-mcp-server#readme",
   "dependencies": {
     "@google/genai": "^0.8.0",
+    "@google/generative-ai": "^0.24.0",
     "@modelcontextprotocol/sdk": "^1.7.0",
     "@types/node": "^22.13.13",
     "axios": "^1.8.4",
