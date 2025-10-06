@@ -1,6 +1,5 @@
 # 依存関係
 node_modules/
-package-lock.json
 
 # ビルド出力
 dist/

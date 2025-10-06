@@ -4,8 +4,8 @@ FROM node:lts-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy package files (lock file optional)
+COPY package*.json ./
 
 # Install dependencies without running scripts
 RUN npm install --ignore-scripts
