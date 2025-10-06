@@ -1,5 +1,5 @@
 {
-  "name": "image-mcp-server",
+  "name": "gemini-image-mcp-server",
   "version": "1.2.0",
   "description": "MCP server for image and video analysis powered by Gemini 2.0 Flash",
   "main": "dist/index.js",

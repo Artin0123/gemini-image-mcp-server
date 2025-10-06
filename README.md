@@ -1,7 +1,7 @@
 
 # image-mcp-server-gemini
 
-[![smithery badge](https://smithery.ai/badge/@Rentapad/image-mcp-server-gemini)](https://smithery.ai/server/@Rentapad/image-mcp-server-gemini)
+[![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
 An MCP server that receives image/video URLs or local file paths and analyzes their content using the Gemini 2.0 Flash model.(forked from github.com/champierre/image-mcp-server)
 
 ## Features
@@ -20,17 +20,17 @@ An MCP server that receives image/video URLs or local file paths and analyzes th
 
 ### Installing via Smithery
 
-To install Image Analysis Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@Rentapad/image-mcp-server-gemini):
+To install Image Analysis Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server):
 
 ```bash
-npx -y @smithery/cli install @Rentapad/image-mcp-server --client claude
+npx -y @smithery/cli install @Artin0123/gemini-image-mcp-server --client claude
 ```
 
 ### Manual Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Rentapad/image-mcp-server-gemini.git 
+git clone https://github.com/Artin0123/gemini-image-mcp-server.git 
 cd image-mcp-server-gemini
 
 # Install dependencies
@@ -89,7 +89,7 @@ Add the following to `claude_desktop_config.json`:
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
         "GEMINI_API_KEY": "your_gemini_api_key",
-        "GEMINI_MODEL": "gemini-2.0-flash",
+        "GEMINI_MODEL": "gemini-flash-lite-latest",
         "MCP_DISABLED_TOOLS": "analyze_video"
       }
     }
