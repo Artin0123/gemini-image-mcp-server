@@ -1,9 +1,6 @@
 
 # image-mcp-server-gemini
 
-
-
-
 [![smithery badge](https://smithery.ai/badge/@Rentapad/image-mcp-server-gemini)](https://smithery.ai/server/@Rentapad/image-mcp-server-gemini)
 An MCP server that receives image/video URLs or local file paths and analyzes their content using the Gemini 2.0 Flash model.(forked from github.com/champierre/image-mcp-server)
 
@@ -16,6 +13,7 @@ An MCP server that receives image/video URLs or local file paths and analyzes th
 - High-precision recognition and description using the Gemini 2.0 Flash model.
 - URL validity checking and local file loading with Base64 encoding.
 - Basic security checks for local file paths.
+- Configurable default model selection and per-tool disable lists.
 - Handles various image and video MIME types (see Usage section for details).
 
 ## Installation
@@ -50,6 +48,11 @@ To use this server, you need a Gemini API key. Set the following environment var
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
+Optional environment variables let you customise behaviour without code changes:
+
+- `GEMINI_MODEL`: Override the default Gemini model (defaults to `gemini-2.0-flash`).
+- `DISABLED_TOOLS` / `MCP_DISABLED_TOOLS`: Comma- or JSON-separated list of tool names to disable (e.g. `analyze_video`). Disabled tools are hidden from clients and respond with a configuration error if invoked directly.
+
 ## MCP Server Configuration
 
 To use with tools like Cline, add the following settings to your MCP server configuration file:
@@ -65,7 +68,9 @@ Add the following to `cline_mcp_settings.json`:
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key"
+        "GEMINI_API_KEY": "your_gemini_api_key",
+        "GEMINI_MODEL": "gemini-flash-lite-latest",
+        "MCP_DISABLED_TOOLS": "analyze_video"
       }
     }
   }
@@ -83,7 +88,9 @@ Add the following to `claude_desktop_config.json`:
       "command": "node",
       "args": ["/path/to/image-mcp-server/dist/index.js"],
       "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key"
+        "GEMINI_API_KEY": "your_gemini_api_key",
+        "GEMINI_MODEL": "gemini-2.0-flash",
+        "MCP_DISABLED_TOOLS": "analyze_video"
       }
     }
   }
@@ -148,6 +155,8 @@ When using the `..._from_path` tools, the AI assistant (client) must specify **v
 
 **Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is, applying basic security checks.
 
+Local files must live under the server's workspace root (the directory where the process starts, after resolving symlinks). Start the server from the folder that contains the media you want to expose, or restructure your project so relevant assets sit beneath that directory.
+
 ### Note: Type Errors During Build
 
 When running `npm run build`, you may see an error (TS7016) about missing TypeScript type definitions for the `mime-types` module.
@@ -169,9 +178,29 @@ yarn add --dev @types/mime-types
 ```bash
 # Run in development mode
 npm run dev
+
+# Run unit tests (path resolution, configuration parsing, media prompts)
+npm test
 ```
+
+### Manual Gemini smoke test
+
+Use the bundled script to quickly verify Gemini access without wiring an MCP client:
+
+```bash
+npm run test:gemini -- [optional-local-image] [optional-local-video]
+```
+
+- Omitting arguments analyzes a sample remote image and a YouTube clip.
+- Provide a local image path and/or video path (keep inline video sources under ~20 MB) to include your own files in the request.
+- You can override prompts or sample URLs with environment variables such as `IMAGE_PROMPT`, `VIDEO_PROMPT`, `SAMPLE_IMAGE_URL`, `SAMPLE_VIDEO_URL`, and `SAMPLE_YOUTUBE_URL`.
+
+## Special thanks
+- [image-mcp-server-gemini](https://github.com/murataskin/image-mcp-server-gemini)
+- [image-mcp-server](https://github.com/champierre/image-mcp-server)
+
+> Edited by GitHub Copilot
 
 ## License
 
 MIT
-```

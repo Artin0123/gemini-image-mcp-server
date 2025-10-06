@@ -1,40 +1,38 @@
 {
   "name": "image-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for image analysis using GPT-4o-mini",
+  "version": "1.2.0",
+  "description": "MCP server for image and video analysis powered by Gemini 2.0 Flash",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --loader ts-node/esm --test tests/server-config.test.ts tests/gemini-media.test.ts",
     "test:gemini": "node --loader ts-node/esm src/test-gemini.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/champierre/image-mcp-server.git"
+    "url": "git+https://github.com/Artin0123/image-mcp-server-gemini.git"
   },
   "keywords": [],
-  "author": "Junya Ishihara",
+  "author": "Artin",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/champierre/image-mcp-server/issues"
+    "url": "https://github.com/Artin0123/image-mcp-server-gemini/issues"
   },
-  "homepage": "https://github.com/champierre/image-mcp-server#readme",
+  "homepage": "https://github.com/Artin0123/image-mcp-server-gemini#readme",
   "dependencies": {
-    "@google/genai": "^0.8.0",
-    "@google/generative-ai": "^0.24.0",
-    "@modelcontextprotocol/sdk": "^1.7.0",
-    "@types/node": "^22.13.13",
-    "axios": "^1.8.4",
-    "dotenv": "^16.4.7",
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.19.1",
+    "@types/node": "^24.6.2",
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
     "mime-types": "^3.0.1",
-    "openai": "^4.89.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/mime-types": "^2.1.4"
+    "@types/mime-types": "^3.0.1"
   }
 }
