@@ -2,18 +2,17 @@
 import { config as dotenvConfig } from 'dotenv';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import * as mime from 'mime-types';
 import {
   GeminiMediaAnalyzer,
   UrlImageSource,
-  Base64ImageSource,
+  LocalImageSource,
   UrlVideoSource,
-  Base64VideoSource,
+  LocalVideoSource,
   YouTubeVideoSource,
 } from './gemini-media.js';
 import {
@@ -21,14 +20,11 @@ import {
   ToolName,
   KNOWN_TOOL_NAMES,
   isKnownToolName,
-  resolveLocalPath,
   loadServerOptions,
 } from './server-config.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 loadEnvironmentVariables();
-
-const LOCAL_VIDEO_SIZE_LIMIT_MB = 25;
 
 const ToolNameSchema = z.enum(KNOWN_TOOL_NAMES as [ToolName, ...ToolName[]]);
 
@@ -140,38 +136,56 @@ type CreateServerArgs = {
   logger?: Logger;
 };
 
-const AnalyzeImageArgsSchema = z.object({
+const AnalyzeImageParamsSchema = {
   imageUrls: z
     .array(z.string().trim().min(1))
     .nonempty('Provide at least one image URL to analyze.'),
   prompt: z.string().trim().optional(),
-});
+} satisfies z.ZodRawShape;
 
-const AnalyzeImagePathArgsSchema = z.object({
-  imagePaths: z
-    .array(z.string().trim().min(1))
-    .nonempty('Provide at least one local image path to analyze.'),
+const AnalyzeImageArgsSchema = z.object(AnalyzeImageParamsSchema);
+
+const LocalFileInputParamsSchema = {
+  path: z.string().trim().min(1, 'Provide a local file path.'),
+  mimeType: z.string().trim().optional(),
+  displayName: z.string().trim().optional(),
+} satisfies z.ZodRawShape;
+
+const LocalFileInputSchema = z.object(LocalFileInputParamsSchema);
+
+const AnalyzeImageLocalParamsSchema = {
+  images: z
+    .array(LocalFileInputSchema)
+    .nonempty('Provide at least one local image file to analyze.'),
   prompt: z.string().trim().optional(),
-});
+} satisfies z.ZodRawShape;
 
-const AnalyzeVideoArgsSchema = z.object({
+const AnalyzeImageLocalArgsSchema = z.object(AnalyzeImageLocalParamsSchema);
+
+const AnalyzeVideoParamsSchema = {
   videoUrls: z
     .array(z.string().trim().min(1))
     .nonempty('Provide at least one video URL to analyze.'),
   prompt: z.string().trim().optional(),
-});
+} satisfies z.ZodRawShape;
 
-const AnalyzeVideoPathArgsSchema = z.object({
-  videoPaths: z
-    .array(z.string().trim().min(1))
-    .nonempty('Provide at least one local video path to analyze.'),
+const AnalyzeVideoArgsSchema = z.object(AnalyzeVideoParamsSchema);
+
+const AnalyzeVideoLocalParamsSchema = {
+  videos: z
+    .array(LocalFileInputSchema)
+    .nonempty('Provide at least one local video file to analyze.'),
   prompt: z.string().trim().optional(),
-});
+} satisfies z.ZodRawShape;
 
-const AnalyzeYouTubeArgsSchema = z.object({
+const AnalyzeVideoLocalArgsSchema = z.object(AnalyzeVideoLocalParamsSchema);
+
+const AnalyzeYouTubeParamsSchema = {
   youtubeUrl: z.string().trim().min(1, 'A YouTube URL is required.'),
   prompt: z.string().trim().optional(),
-});
+} satisfies z.ZodRawShape;
+
+const AnalyzeYouTubeArgsSchema = z.object(AnalyzeYouTubeParamsSchema);
 
 export function createGeminiMcpServer({ config, logger }: CreateServerArgs): McpServer {
   const geminiApiKey = (config.geminiApiKey ?? process.env.GEMINI_API_KEY)?.trim();
@@ -185,7 +199,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
   const modelName = config.modelName?.trim() ?? baseOptions.modelName;
   const disabledTools = mergeDisabledTools(baseOptions.disabledTools, config.disabledTools ?? []);
 
-  const analyzer = new GeminiMediaAnalyzer(new GoogleGenerativeAI(geminiApiKey), modelName);
+  const analyzer = new GeminiMediaAnalyzer(new GoogleGenAI({ apiKey: geminiApiKey }), modelName);
   const server = new McpServer({
     name: 'gemini-image-mcp-server',
     version: SERVER_VERSION,
@@ -198,9 +212,9 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
   );
 
   registerImageUrlTool(server, analyzer, disabledTools);
-  registerImagePathTool(server, analyzer, disabledTools);
+  registerImageLocalTool(server, analyzer, disabledTools);
   registerVideoUrlTool(server, analyzer, disabledTools);
-  registerVideoPathTool(server, analyzer, disabledTools);
+  registerVideoLocalTool(server, analyzer, disabledTools);
   registerYouTubeTool(server, analyzer, disabledTools);
 
   return server;
@@ -215,44 +229,58 @@ function registerImageUrlTool(
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
 ) {
-  server.tool(
-    'analyze_image',
-    'Analyzes images available via URLs using Gemini API.',
-    AnalyzeImageArgsSchema.shape,
-    async ({ imageUrls, prompt }: z.infer<typeof AnalyzeImageArgsSchema>) =>
-      executeTool('analyze_image', disabledTools, async () => {
-        const imageSources: UrlImageSource[] = imageUrls.map((url) => ({
-          type: 'url' as const,
-          data: url,
-        }));
-        return analyzer.analyzeImages(imageSources, prompt);
-      }),
-  );
+  server
+    .tool(
+      'analyze_image',
+      {
+        title: 'Analyze Image (URL)',
+        description: 'Analyzes images available via URLs using Gemini API.',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      async (args) =>
+        executeTool('analyze_image', disabledTools, async () => {
+          const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(args);
+          const imageSources: UrlImageSource[] = imageUrls.map((url) => ({
+            type: 'url' as const,
+            data: url,
+          }));
+          return analyzer.analyzeImages(imageSources, prompt);
+        }),
+    )
+    .update({
+      paramsSchema: AnalyzeImageParamsSchema as any,
+    });
 }
 
-function registerImagePathTool(
+function registerImageLocalTool(
   server: McpServer,
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
 ) {
-  server.tool(
-    'analyze_image_from_path',
-    'Analyzes local image files using Gemini API.',
-    AnalyzeImagePathArgsSchema.shape,
-    async ({ imagePaths, prompt }: z.infer<typeof AnalyzeImagePathArgsSchema>) =>
-      executeTool('analyze_image_from_path', disabledTools, async () => {
-        const result = readImagesFromPaths(imagePaths);
-        logPathWarnings(result.warnings, 'image');
-        if (result.sources.length === 0) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            buildPathFailureMessage('image', result.errors),
-          );
-        }
-        logPartialFailures(result.errors, 'image');
-        return analyzer.analyzeImages(result.sources, prompt);
-      }),
-  );
+  server
+    .tool(
+      'analyze_image_local',
+      {
+        title: 'Analyze Image (Local)',
+        description: 'Analyzes local image files by uploading them with the Gemini Files API.',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      async (args) =>
+        executeTool('analyze_image_local', disabledTools, async () => {
+          const { images, prompt } = AnalyzeImageLocalArgsSchema.parse(args);
+          const imageSources: LocalImageSource[] = images.map((entry) => ({
+            type: 'local',
+            data: entry.path,
+            mimeType: entry.mimeType,
+          }));
+          return analyzer.analyzeImages(imageSources, prompt);
+        }),
+    )
+    .update({
+      paramsSchema: AnalyzeImageLocalParamsSchema as any,
+    });
 }
 
 function registerVideoUrlTool(
@@ -260,44 +288,58 @@ function registerVideoUrlTool(
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
 ) {
-  server.tool(
-    'analyze_video',
-    'Analyzes videos accessible via URLs using Gemini API.',
-    AnalyzeVideoArgsSchema.shape,
-    async ({ videoUrls, prompt }: z.infer<typeof AnalyzeVideoArgsSchema>) =>
-      executeTool('analyze_video', disabledTools, async () => {
-        const videoSources: UrlVideoSource[] = videoUrls.map((url) => ({
-          type: 'url' as const,
-          data: url,
-        }));
-        return analyzer.analyzeVideos(videoSources, prompt);
-      }),
-  );
+  server
+    .tool(
+      'analyze_video',
+      {
+        title: 'Analyze Video (URL)',
+        description: 'Analyzes videos accessible via URLs using Gemini API.',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      async (args) =>
+        executeTool('analyze_video', disabledTools, async () => {
+          const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(args);
+          const videoSources: UrlVideoSource[] = videoUrls.map((url) => ({
+            type: 'url' as const,
+            data: url,
+          }));
+          return analyzer.analyzeVideos(videoSources, prompt);
+        }),
+    )
+    .update({
+      paramsSchema: AnalyzeVideoParamsSchema as any,
+    });
 }
 
-function registerVideoPathTool(
+function registerVideoLocalTool(
   server: McpServer,
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
 ) {
-  server.tool(
-    'analyze_video_from_path',
-    'Analyzes local video files using Gemini API (small files recommended).',
-    AnalyzeVideoPathArgsSchema.shape,
-    async ({ videoPaths, prompt }: z.infer<typeof AnalyzeVideoPathArgsSchema>) =>
-      executeTool('analyze_video_from_path', disabledTools, async () => {
-        const result = readVideosFromPaths(videoPaths);
-        logPathWarnings(result.warnings, 'video');
-        if (result.sources.length === 0) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            buildPathFailureMessage('video', result.errors),
-          );
-        }
-        logPartialFailures(result.errors, 'video');
-        return analyzer.analyzeVideos(result.sources, prompt);
-      }),
-  );
+  server
+    .tool(
+      'analyze_video_local',
+      {
+        title: 'Analyze Video (Local)',
+        description: 'Analyzes local video files by uploading them with the Gemini Files API.',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      async (args) =>
+        executeTool('analyze_video_local', disabledTools, async () => {
+          const { videos, prompt } = AnalyzeVideoLocalArgsSchema.parse(args);
+          const videoSources: LocalVideoSource[] = videos.map((entry) => ({
+            type: 'local',
+            data: entry.path,
+            mimeType: entry.mimeType,
+          }));
+          return analyzer.analyzeVideos(videoSources, prompt);
+        }),
+    )
+    .update({
+      paramsSchema: AnalyzeVideoLocalParamsSchema as any,
+    });
 }
 
 function registerYouTubeTool(
@@ -305,21 +347,30 @@ function registerYouTubeTool(
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
 ) {
-  server.tool(
-    'analyze_youtube_video',
-    'Analyzes a video directly from a YouTube URL using Gemini API.',
-    AnalyzeYouTubeArgsSchema.shape,
-    async ({ youtubeUrl, prompt }: z.infer<typeof AnalyzeYouTubeArgsSchema>) =>
-      executeTool('analyze_youtube_video', disabledTools, async () => {
-        const videoSources: YouTubeVideoSource[] = [
-          {
-            type: 'youtube',
-            data: youtubeUrl,
-          },
-        ];
-        return analyzer.analyzeVideos(videoSources, prompt);
-      }),
-  );
+  server
+    .tool(
+      'analyze_youtube_video',
+      {
+        title: 'Analyze YouTube Video',
+        description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      async (args) =>
+        executeTool('analyze_youtube_video', disabledTools, async () => {
+          const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(args);
+          const videoSources: YouTubeVideoSource[] = [
+            {
+              type: 'youtube',
+              data: youtubeUrl,
+            },
+          ];
+          return analyzer.analyzeVideos(videoSources, prompt);
+        }),
+    )
+    .update({
+      paramsSchema: AnalyzeYouTubeParamsSchema as any,
+    });
 }
 
 async function executeTool(
@@ -392,203 +443,6 @@ function createErrorResponse(toolName: ToolName, error: unknown) {
     isError: true as const,
     errorCode: error instanceof McpError ? error.code : ErrorCode.InternalError,
   };
-}
-
-type PathReadResult<T> = {
-  sources: T[];
-  errors: string[];
-  warnings: string[];
-};
-
-function readImagesFromPaths(
-  imagePaths: string[],
-): PathReadResult<Base64ImageSource> {
-  const sources: Base64ImageSource[] = [];
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  for (const imagePath of imagePaths) {
-    const outcome = toBase64ImageSource(imagePath, warnings);
-    if (typeof outcome === 'string') {
-      errors.push(outcome);
-      continue;
-    }
-
-    if (outcome) {
-      sources.push(outcome);
-    }
-  }
-
-  return { sources, errors, warnings };
-}
-
-function readVideosFromPaths(
-  videoPaths: string[],
-): PathReadResult<Base64VideoSource> {
-  const sources: Base64VideoSource[] = [];
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  for (const videoPath of videoPaths) {
-    const outcome = toBase64VideoSource(videoPath, warnings);
-    if (typeof outcome === 'string') {
-      errors.push(outcome);
-      continue;
-    }
-
-    if (outcome) {
-      sources.push(outcome);
-    }
-  }
-
-  return { sources, errors, warnings };
-}
-
-function toBase64ImageSource(
-  imagePath: string,
-  warnings: string[],
-): Base64ImageSource | string | null {
-  let wasRelative = false;
-  const resolvedPath = resolveLocalPath(imagePath, {
-    onRelative: (absolute) => {
-      wasRelative = true;
-      warnings.push(`Relative path "${imagePath}" resolved to "${absolute}". Prefer using absolute paths.`);
-    },
-  });
-
-  if (!resolvedPath) {
-    console.warn(`Could not resolve local image path: ${imagePath}. Ensure the path is absolute and accessible. Skipping.`);
-    return `Path could not be resolved (use an absolute path): ${imagePath}`;
-  }
-
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Image file not found: ${resolvedPath}. Skipping.`);
-    return `File not found: ${resolvedPath}`;
-  }
-
-  try {
-    const stats = fs.statSync(resolvedPath);
-
-    if (!stats.isFile()) {
-      console.warn(`Path is not a regular file: ${resolvedPath}. Skipping.`);
-      return `Not a regular file: ${resolvedPath}`;
-    }
-
-    const fileBuffer = fs.readFileSync(resolvedPath);
-    const lookupType = mime.lookup(resolvedPath);
-    const mimeType = typeof lookupType === 'string' ? lookupType : 'application/octet-stream';
-
-    if (!mimeType.startsWith('image/')) {
-      console.warn(`File is not an image: ${resolvedPath} (MIME: ${mimeType}). Skipping.`);
-      return `Unsupported image MIME type (${mimeType}) at ${resolvedPath}`;
-    }
-
-    const source: Base64ImageSource = {
-      type: 'base64',
-      data: fileBuffer.toString('base64'),
-      mimeType,
-    };
-
-    if (wasRelative) {
-      warnings.push(`Successfully read ${resolvedPath}, originally provided as relative path "${imagePath}".`);
-    }
-
-    return source;
-  } catch (error) {
-    console.error(`Error reading image file ${resolvedPath}:`, error);
-    return `Failed to read image file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
-  }
-}
-
-function toBase64VideoSource(
-  videoPath: string,
-  warnings: string[],
-): Base64VideoSource | string | null {
-  let wasRelative = false;
-  const resolvedPath = resolveLocalPath(videoPath, {
-    onRelative: (absolute) => {
-      wasRelative = true;
-      warnings.push(`Relative path "${videoPath}" resolved to "${absolute}". Prefer using absolute paths.`);
-    },
-  });
-
-  if (!resolvedPath) {
-    console.warn(`Could not resolve local video path: ${videoPath}. Ensure the path is absolute and accessible. Skipping.`);
-    return `Path could not be resolved (use an absolute path): ${videoPath}`;
-  }
-
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Video file not found: ${resolvedPath}. Skipping.`);
-    return `File not found: ${resolvedPath}`;
-  }
-
-  try {
-    const stats = fs.statSync(resolvedPath);
-
-    if (!stats.isFile()) {
-      console.warn(`Path is not a regular file: ${resolvedPath}. Skipping.`);
-      return `Not a regular file: ${resolvedPath}`;
-    }
-
-    const fileSizeMB = stats.size / (1024 * 1024);
-
-    if (fileSizeMB > LOCAL_VIDEO_SIZE_LIMIT_MB) {
-      console.warn(
-        `Skipping large video (~${fileSizeMB.toFixed(2)} MB > ${LOCAL_VIDEO_SIZE_LIMIT_MB} MB limit) from ${resolvedPath}.`,
-      );
-      return `Video too large (~${fileSizeMB.toFixed(2)} MB) for inline upload: ${resolvedPath}`;
-    }
-
-    const fileBuffer = fs.readFileSync(resolvedPath);
-    const lookupType = mime.lookup(resolvedPath);
-    const mimeType = typeof lookupType === 'string' ? lookupType : 'application/octet-stream';
-
-    const source: Base64VideoSource = {
-      type: 'base64',
-      data: fileBuffer.toString('base64'),
-      mimeType,
-    };
-
-    if (wasRelative) {
-      warnings.push(`Successfully read ${resolvedPath}, originally provided as relative path "${videoPath}".`);
-    }
-
-    return source;
-  } catch (error) {
-    console.error(`Error reading video file ${resolvedPath}:`, error);
-    return `Failed to read video file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
-  }
-}
-
-function buildPathFailureMessage(kind: 'image' | 'video', errors: string[]): string {
-  if (errors.length === 0) {
-    return `No valid local ${kind} files could be processed from the provided paths.`;
-  }
-
-  const uniqueErrors = Array.from(new Set(errors));
-  return `No valid local ${kind} files could be processed from the provided paths. Details: ${uniqueErrors.join('; ')}`;
-}
-
-function logPartialFailures(errors: string[], kind: 'image' | 'video'): void {
-  if (errors.length === 0) {
-    return;
-  }
-
-  const uniqueErrors = Array.from(new Set(errors));
-  for (const message of uniqueErrors) {
-    console.warn(`Partial ${kind} path failure: ${message}`);
-  }
-}
-
-function logPathWarnings(warnings: string[], kind: 'image' | 'video'): void {
-  if (warnings.length === 0) {
-    return;
-  }
-
-  const uniqueWarnings = Array.from(new Set(warnings));
-  for (const message of uniqueWarnings) {
-    console.warn(`Relative ${kind} path warning: ${message}`);
-  }
 }
 
 function isExecutedDirectly(): boolean {

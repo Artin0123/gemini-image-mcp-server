@@ -1,12 +1,8 @@
-import * as os from 'os';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
-
 export type ToolName =
     | 'analyze_image'
-    | 'analyze_image_from_path'
+    | 'analyze_image_local'
     | 'analyze_video'
-    | 'analyze_video_from_path'
+    | 'analyze_video_local'
     | 'analyze_youtube_video';
 
 export type ServerOptions = {
@@ -19,107 +15,14 @@ export const DEFAULT_MODEL_NAME = 'gemini-flash-lite-latest';
 
 export const KNOWN_TOOL_NAMES: readonly ToolName[] = [
     'analyze_image',
-    'analyze_image_from_path',
+    'analyze_image_local',
     'analyze_video',
-    'analyze_video_from_path',
+    'analyze_video_local',
     'analyze_youtube_video',
 ];
 
 export function isKnownToolName(value: string): value is ToolName {
     return (KNOWN_TOOL_NAMES as readonly string[]).includes(value);
-}
-
-export type ResolveLocalPathOptions = {
-    quiet?: boolean;
-    onRelative?: (absolutePath: string) => void;
-};
-
-export function resolveLocalPath(inputPath: string, options?: ResolveLocalPathOptions): string | null {
-    if (typeof inputPath !== 'string') {
-        return null;
-    }
-
-    const quiet = options?.quiet ?? false;
-
-    let candidate = inputPath.trim();
-    if (!candidate) {
-        return null;
-    }
-
-    if (
-        (candidate.startsWith('"') && candidate.endsWith('"')) ||
-        (candidate.startsWith('\'') && candidate.endsWith('\''))
-    ) {
-        candidate = candidate.slice(1, -1);
-    }
-
-    if (/^file:\/\//i.test(candidate)) {
-        try {
-            candidate = fileURLToPath(new URL(candidate));
-        } catch (error) {
-            if (!quiet) {
-                console.warn(
-                    `Invalid file URL supplied: ${candidate}. ${error instanceof Error ? error.message : String(error)}`
-                );
-            }
-            return null;
-        }
-    } else {
-        candidate = expandEnvironmentVariables(candidate);
-
-        if (candidate.startsWith('~')) {
-            const homeDir = os.homedir();
-            if (!homeDir) {
-                if (!quiet) {
-                    console.warn(`Cannot resolve '~' in path ${inputPath} because the home directory is unknown.`);
-                }
-                return null;
-            }
-
-            candidate = path.join(homeDir, candidate.slice(1));
-        }
-    }
-
-    if (!isAbsolutePath(candidate)) {
-        const resolved = path.resolve(candidate);
-        options?.onRelative?.(resolved);
-        candidate = resolved;
-    }
-
-    return path.normalize(candidate);
-}
-
-function isAbsolutePath(value: string): boolean {
-    if (path.isAbsolute(value)) {
-        return true;
-    }
-
-    if (path.win32.isAbsolute(value)) {
-        return true;
-    }
-
-    return false;
-}
-
-export function expandEnvironmentVariables(value: string): string {
-    let result = value;
-
-    result = result.replace(/\$(\w+)|\$\{([^}]+)\}/g, (match, simple, braced) => {
-        const key = (simple ?? braced) as string | undefined;
-        if (!key) {
-            return match;
-        }
-
-        const envValue = process.env[key];
-        return envValue !== undefined ? envValue : match;
-    });
-
-    result = result.replace(/%([^%]+)%/g, (match, key) => {
-        const envValue = process.env[key];
-        return envValue !== undefined ? envValue : match;
-    });
-
-    return result;
 }
 
 export function parseList(value: string | undefined): string[] {

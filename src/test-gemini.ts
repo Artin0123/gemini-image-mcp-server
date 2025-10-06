@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { config as dotenvConfig } from 'dotenv';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import path from 'path';
 import mime from 'mime-types';
@@ -8,9 +8,9 @@ import mime from 'mime-types';
 import {
   GeminiMediaAnalyzer,
   UrlImageSource,
-  Base64ImageSource,
+  LocalImageSource,
   UrlVideoSource,
-  Base64VideoSource,
+  LocalVideoSource,
   YouTubeVideoSource,
   supportedVideoMimeTypes,
 } from './gemini-media.js';
@@ -29,7 +29,7 @@ const modelName =
   process.env.TEST_GEMINI_MODEL ??
   DEFAULT_MODEL_NAME;
 
-const analyzer = new GeminiMediaAnalyzer(new GoogleGenerativeAI(GEMINI_API_KEY), modelName);
+const analyzer = new GeminiMediaAnalyzer(new GoogleGenAI({ apiKey: GEMINI_API_KEY }), modelName);
 
 const DEFAULT_IMAGE_URL =
   process.env.SAMPLE_IMAGE_URL ?? 'https://storage.googleapis.com/generativeai-downloads/images/scones.jpg';
@@ -38,11 +38,9 @@ const DEFAULT_VIDEO_URL =
 const DEFAULT_YOUTUBE_URL =
   process.env.SAMPLE_YOUTUBE_URL ?? 'https://www.youtube.com/watch?v=9hE5-98ZeCg';
 
-const INLINE_VIDEO_SIZE_LIMIT_MB = 19;
+type AnyVideoSource = UrlVideoSource | LocalVideoSource | YouTubeVideoSource;
 
-type AnyVideoSource = UrlVideoSource | Base64VideoSource | YouTubeVideoSource;
-
-function readLocalImage(imagePath: string): Base64ImageSource | null {
+function readLocalImage(imagePath: string): LocalImageSource | null {
   const resolvedPath = path.resolve(imagePath);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -51,7 +49,6 @@ function readLocalImage(imagePath: string): Base64ImageSource | null {
   }
 
   try {
-    const buffer = fs.readFileSync(resolvedPath);
     const lookupType = mime.lookup(resolvedPath);
     const mimeType = typeof lookupType === 'string' ? lookupType : 'application/octet-stream';
 
@@ -61,8 +58,8 @@ function readLocalImage(imagePath: string): Base64ImageSource | null {
     }
 
     return {
-      type: 'base64',
-      data: buffer.toString('base64'),
+      type: 'local',
+      data: resolvedPath,
       mimeType,
     };
   } catch (error) {
@@ -71,7 +68,7 @@ function readLocalImage(imagePath: string): Base64ImageSource | null {
   }
 }
 
-function readLocalVideo(videoPath: string): Base64VideoSource | null {
+function readLocalVideo(videoPath: string): LocalVideoSource | null {
   const resolvedPath = path.resolve(videoPath);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -80,16 +77,6 @@ function readLocalVideo(videoPath: string): Base64VideoSource | null {
   }
 
   try {
-    const buffer = fs.readFileSync(resolvedPath);
-    const approxSizeMb = (buffer.length * (4 / 3)) / (1024 * 1024);
-
-    if (approxSizeMb > INLINE_VIDEO_SIZE_LIMIT_MB) {
-      console.warn(
-        `Local video is too large (~${approxSizeMb.toFixed(2)} MB > ${INLINE_VIDEO_SIZE_LIMIT_MB} MB inline limit). Skipping ${resolvedPath}.`
-      );
-      return null;
-    }
-
     const lookupType = mime.lookup(resolvedPath);
     const detectedMimeType = typeof lookupType === 'string' ? lookupType : 'application/octet-stream';
     const finalMimeType = mapVideoMimeType(detectedMimeType);
@@ -102,8 +89,8 @@ function readLocalVideo(videoPath: string): Base64VideoSource | null {
     }
 
     return {
-      type: 'base64',
-      data: buffer.toString('base64'),
+      type: 'local',
+      data: resolvedPath,
       mimeType: finalMimeType,
     };
   } catch (error) {
@@ -113,25 +100,39 @@ function readLocalVideo(videoPath: string): Base64VideoSource | null {
 }
 
 function mapVideoMimeType(mimeType: string): string {
-  if (mimeType === 'application/mp4') {
+  const lowered = mimeType.toLowerCase();
+
+  if (lowered === 'application/mp4') {
     return 'video/mp4';
   }
 
-  if (mimeType === 'video/quicktime') {
-    return 'video/mov';
+  if (lowered === 'video/wmv') {
+    return 'video/x-ms-wmv';
   }
 
-  return mimeType;
+  if (lowered === 'video/avi') {
+    return 'video/x-msvideo';
+  }
+
+  if (lowered === 'video/mov') {
+    return 'video/quicktime';
+  }
+
+  if (lowered === 'video/mpg') {
+    return 'video/mpeg';
+  }
+
+  return lowered;
 }
 
 function isSupportedVideoMimeType(
   mimeType: string
 ): mimeType is (typeof supportedVideoMimeTypes)[number] {
-  return (supportedVideoMimeTypes as readonly string[]).includes(mimeType);
+  return (supportedVideoMimeTypes as readonly string[]).includes(mimeType.toLowerCase());
 }
 
 async function run(): Promise<void> {
-  const imageSources: (UrlImageSource | Base64ImageSource)[] = [
+  const imageSources: (UrlImageSource | LocalImageSource)[] = [
     {
       type: 'url',
       data: DEFAULT_IMAGE_URL,

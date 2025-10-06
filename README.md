@@ -90,6 +90,7 @@ Add the variables directly to your MCP configuration file. Supplying `cwd` keeps
 
 - `GEMINI_MODEL`: Override the default Gemini model (defaults to `gemini-2.0-flash`).
 - `DISABLED_TOOLS` / `MCP_DISABLED_TOOLS`: Comma- or JSON-separated list of tool names to disable (e.g. `analyze_video`). Disabled tools are hidden from clients and respond with a configuration error if invoked directly.
+- `MCP_MEDIA_BASE_DIRS` (or `MCP_MEDIA_BASE_DIR` / `MCP_MEDIA_SEARCH_DIRS`): Optional list of directories to search when resolving relative local file paths. Provide a comma-separated string or JSON array. The server also considers `MCP_WORKSPACE_ROOT` and `WORKSPACE_ROOT` if set.
 
 When deploying through Smithery's TypeScript runtime, these options are also surfaced in the hosted configuration UI. The server exports a schema requiring the Gemini API key and exposing optional `modelName` and `disabledTools` fields, so operators can manage them without editing environment variables.
 
@@ -201,7 +202,13 @@ When using the `..._from_path` tools, the AI assistant (client) must specify **v
 
 **Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is, applying basic security checks.
 
-The server will load any local media path that exists on the host machine, regardless of where the server process was started. For predictable results, supply absolute paths so the assistant never relies on an inherited current working directory.
+Relative paths are resolved against a list of search directories gathered from `MCP_MEDIA_BASE_DIRS`, `MCP_MEDIA_BASE_DIR`, `MCP_MEDIA_SEARCH_DIRS`, `MCP_WORKSPACE_ROOT`, `WORKSPACE_ROOT`, and the process working directories (`process.cwd()`, `INIT_CWD`, `PWD`). Configure one of the environment variables for predictable results when the MCP client launches the server from a different directory.
+
+The server will load any local media path that exists on the host machine, regardless of where the server process was started. For predictable results, supply absolute paths so the assistant never relies on an inherited current working directory, or set `MCP_MEDIA_BASE_DIRS` so the intended workspace is included in the search list.
+
+### Gemini Files API display names
+
+Google's Gemini Files API currently rejects `displayName` metadata on uploads. The server still accepts an optional `displayName` field in tool requests for forward compatibility, but it strips the value before calling Gemini. Clients should not rely on `displayName` appearing in the generated response payloads.
 
 ### Note: Type Errors During Build
 
