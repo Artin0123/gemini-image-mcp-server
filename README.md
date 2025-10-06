@@ -201,7 +201,7 @@ When using the `..._from_path` tools, the AI assistant (client) must specify **v
 
 **Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is, applying basic security checks.
 
-The server will load any local media path that exists on the host machine, regardless of where the server process was started.
+The server will load any local media path that exists on the host machine, regardless of where the server process was started. For predictable results, supply absolute paths so the assistant never relies on an inherited current working directory.
 
 ### Note: Type Errors During Build
 

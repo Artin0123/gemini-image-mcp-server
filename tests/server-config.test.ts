@@ -10,21 +10,23 @@ import {
     DEFAULT_MODEL_NAME,
 } from '../src/server-config.js';
 
-test('resolveLocalPath resolves relative paths within the current working directory', (t) => {
-    const originalCwd = process.cwd();
+test('resolveLocalPath rejects relative paths', () => {
+    const resolved = resolveLocalPath('test.png', { quiet: true });
+    assert.equal(resolved, null, 'Relative paths should be rejected');
+});
+
+test('resolveLocalPath resolves absolute paths', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-mcp-'));
     const testImagePath = path.join(tempDir, 'test.png');
     fs.writeFileSync(testImagePath, Buffer.from([0xff]));
 
-    process.chdir(tempDir);
-    t.after(() => {
-        process.chdir(originalCwd);
+    try {
+        const resolved = resolveLocalPath(testImagePath);
+        assert.ok(resolved, 'Absolute path should resolve');
+        assert.equal(resolved, path.normalize(testImagePath));
+    } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
-    });
-
-    const resolved = resolveLocalPath('test.png');
-    assert.ok(resolved, 'Relative path should resolve to an absolute location');
-    assert.equal(resolved, path.normalize(testImagePath));
+    }
 });
 
 test('resolveLocalPath supports file:// URLs', () => {

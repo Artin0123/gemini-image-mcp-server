@@ -33,7 +33,7 @@ const LOCAL_VIDEO_SIZE_LIMIT_MB = 25;
 const ToolNameSchema = z.enum(KNOWN_TOOL_NAMES as [ToolName, ...ToolName[]]);
 
 function loadEnvironmentVariables(): void {
-  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const scriptDir = resolveScriptDirectory();
   const searchRoots = [
     process.cwd(),
     scriptDir,
@@ -81,6 +81,23 @@ function loadEnvironmentVariables(): void {
       }
     }
   }
+}
+
+function resolveScriptDirectory(): string {
+  const fallback = process.cwd();
+
+  try {
+    const meta = (import.meta as ImportMeta | undefined);
+    if (meta && typeof meta.url === 'string' && meta.url.length > 0) {
+      return path.dirname(fileURLToPath(meta.url));
+    }
+  } catch (error) {
+    console.warn(
+      `Unable to resolve script directory from import.meta: ${error instanceof Error ? error.message : String(error)}. Falling back to process.cwd().`,
+    );
+  }
+
+  return fallback;
 }
 
 function shouldOverrideGeminiEnv(): boolean {
@@ -428,8 +445,8 @@ function toBase64ImageSource(
   const resolvedPath = resolveLocalPath(imagePath);
 
   if (!resolvedPath) {
-    console.warn(`Could not resolve local image path: ${imagePath}. Skipping.`);
-    return `Path could not be resolved: ${imagePath}`;
+    console.warn(`Could not resolve local image path: ${imagePath}. Ensure the path is absolute and accessible. Skipping.`);
+    return `Path could not be resolved (use an absolute path): ${imagePath}`;
   }
 
   if (!fs.existsSync(resolvedPath)) {
@@ -471,8 +488,8 @@ function toBase64VideoSource(
   const resolvedPath = resolveLocalPath(videoPath);
 
   if (!resolvedPath) {
-    console.warn(`Could not resolve local video path: ${videoPath}. Skipping.`);
-    return `Path could not be resolved: ${videoPath}`;
+    console.warn(`Could not resolve local video path: ${videoPath}. Ensure the path is absolute and accessible. Skipping.`);
+    return `Path could not be resolved (use an absolute path): ${videoPath}`;
   }
 
   if (!fs.existsSync(resolvedPath)) {

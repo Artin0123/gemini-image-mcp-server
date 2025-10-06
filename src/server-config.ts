@@ -75,11 +75,26 @@ export function resolveLocalPath(inputPath: string, options?: { quiet?: boolean 
         }
     }
 
-    if (!path.isAbsolute(candidate)) {
-        candidate = path.resolve(candidate);
+    if (!isAbsolutePath(candidate)) {
+        if (!quiet) {
+            console.warn(`Relative paths are not supported: ${inputPath}. Provide an absolute path.`);
+        }
+        return null;
     }
 
     return path.normalize(candidate);
+}
+
+function isAbsolutePath(value: string): boolean {
+    if (path.isAbsolute(value)) {
+        return true;
+    }
+
+    if (path.win32.isAbsolute(value)) {
+        return true;
+    }
+
+    return false;
 }
 
 export function expandEnvironmentVariables(value: string): string {
