@@ -10,12 +10,41 @@ import {
     DEFAULT_MODEL_NAME,
 } from '../src/server-config.js';
 
-test('resolveLocalPath rejects relative paths', () => {
-    const resolved = resolveLocalPath('test.png', { quiet: true });
-    assert.equal(resolved, null, 'Relative paths should be rejected');
+test('resolveLocalPath resolves relative paths and notifies callback', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-mcp-'));
+    const testImagePath = path.join(tempDir, 'test.png');
+    fs.writeFileSync(testImagePath, Buffer.from([0xff]));
+
+    try {
+        const warnings: string[] = [];
+        const resolved = resolveLocalPath(path.relative(process.cwd(), testImagePath), {
+            onRelative: (abs) => warnings.push(abs),
+        });
+
+        assert.ok(resolved, 'Relative path should resolve to an absolute path');
+        assert.equal(resolved, path.normalize(testImagePath));
+        assert.equal(warnings.length, 1);
+        assert.equal(warnings[0], path.normalize(testImagePath));
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 });
 
-test('resolveLocalPath resolves absolute paths', () => {
+test('resolveLocalPath resolves missing relative paths and still notifies callback', () => {
+    const warnings: string[] = [];
+    const target = path.join('..', 'nonexistent', 'file.png');
+
+    const resolved = resolveLocalPath(target, {
+        onRelative: (abs) => warnings.push(abs),
+    });
+
+    assert.ok(resolved, 'Relative path without an existing file should still resolve absolutely');
+    assert.equal(resolved, path.normalize(path.resolve(target)));
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0], path.normalize(path.resolve(target)));
+});
+
+test('resolveLocalPath resolves absolute paths directly', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-mcp-'));
     const testImagePath = path.join(tempDir, 'test.png');
     fs.writeFileSync(testImagePath, Buffer.from([0xff]));
@@ -24,6 +53,25 @@ test('resolveLocalPath resolves absolute paths', () => {
         const resolved = resolveLocalPath(testImagePath);
         assert.ok(resolved, 'Absolute path should resolve');
         assert.equal(resolved, path.normalize(testImagePath));
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('resolveLocalPath does not call onRelative for absolute paths', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-mcp-'));
+    const testImagePath = path.join(tempDir, 'test.png');
+    fs.writeFileSync(testImagePath, Buffer.from([0xff]));
+
+    try {
+        const warnings: string[] = [];
+        const resolved = resolveLocalPath(testImagePath, {
+            onRelative: (abs) => warnings.push(abs),
+        });
+
+        assert.ok(resolved, 'Absolute path should resolve');
+        assert.equal(resolved, path.normalize(testImagePath));
+        assert.equal(warnings.length, 0);
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
     }

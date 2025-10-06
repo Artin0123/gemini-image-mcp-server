@@ -242,6 +242,7 @@ function registerImagePathTool(
     async ({ imagePaths, prompt }: z.infer<typeof AnalyzeImagePathArgsSchema>) =>
       executeTool('analyze_image_from_path', disabledTools, async () => {
         const result = readImagesFromPaths(imagePaths);
+        logPathWarnings(result.warnings, 'image');
         if (result.sources.length === 0) {
           throw new McpError(
             ErrorCode.InvalidParams,
@@ -286,6 +287,7 @@ function registerVideoPathTool(
     async ({ videoPaths, prompt }: z.infer<typeof AnalyzeVideoPathArgsSchema>) =>
       executeTool('analyze_video_from_path', disabledTools, async () => {
         const result = readVideosFromPaths(videoPaths);
+        logPathWarnings(result.warnings, 'video');
         if (result.sources.length === 0) {
           throw new McpError(
             ErrorCode.InvalidParams,
@@ -395,6 +397,7 @@ function createErrorResponse(toolName: ToolName, error: unknown) {
 type PathReadResult<T> = {
   sources: T[];
   errors: string[];
+  warnings: string[];
 };
 
 function readImagesFromPaths(
@@ -402,9 +405,10 @@ function readImagesFromPaths(
 ): PathReadResult<Base64ImageSource> {
   const sources: Base64ImageSource[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const imagePath of imagePaths) {
-    const outcome = toBase64ImageSource(imagePath);
+    const outcome = toBase64ImageSource(imagePath, warnings);
     if (typeof outcome === 'string') {
       errors.push(outcome);
       continue;
@@ -415,7 +419,7 @@ function readImagesFromPaths(
     }
   }
 
-  return { sources, errors };
+  return { sources, errors, warnings };
 }
 
 function readVideosFromPaths(
@@ -423,9 +427,10 @@ function readVideosFromPaths(
 ): PathReadResult<Base64VideoSource> {
   const sources: Base64VideoSource[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const videoPath of videoPaths) {
-    const outcome = toBase64VideoSource(videoPath);
+    const outcome = toBase64VideoSource(videoPath, warnings);
     if (typeof outcome === 'string') {
       errors.push(outcome);
       continue;
@@ -436,13 +441,20 @@ function readVideosFromPaths(
     }
   }
 
-  return { sources, errors };
+  return { sources, errors, warnings };
 }
 
 function toBase64ImageSource(
   imagePath: string,
+  warnings: string[],
 ): Base64ImageSource | string | null {
-  const resolvedPath = resolveLocalPath(imagePath);
+  let wasRelative = false;
+  const resolvedPath = resolveLocalPath(imagePath, {
+    onRelative: (absolute) => {
+      wasRelative = true;
+      warnings.push(`Relative path "${imagePath}" resolved to "${absolute}". Prefer using absolute paths.`);
+    },
+  });
 
   if (!resolvedPath) {
     console.warn(`Could not resolve local image path: ${imagePath}. Ensure the path is absolute and accessible. Skipping.`);
@@ -471,11 +483,17 @@ function toBase64ImageSource(
       return `Unsupported image MIME type (${mimeType}) at ${resolvedPath}`;
     }
 
-    return {
+    const source: Base64ImageSource = {
       type: 'base64',
       data: fileBuffer.toString('base64'),
       mimeType,
     };
+
+    if (wasRelative) {
+      warnings.push(`Successfully read ${resolvedPath}, originally provided as relative path "${imagePath}".`);
+    }
+
+    return source;
   } catch (error) {
     console.error(`Error reading image file ${resolvedPath}:`, error);
     return `Failed to read image file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
@@ -484,8 +502,15 @@ function toBase64ImageSource(
 
 function toBase64VideoSource(
   videoPath: string,
+  warnings: string[],
 ): Base64VideoSource | string | null {
-  const resolvedPath = resolveLocalPath(videoPath);
+  let wasRelative = false;
+  const resolvedPath = resolveLocalPath(videoPath, {
+    onRelative: (absolute) => {
+      wasRelative = true;
+      warnings.push(`Relative path "${videoPath}" resolved to "${absolute}". Prefer using absolute paths.`);
+    },
+  });
 
   if (!resolvedPath) {
     console.warn(`Could not resolve local video path: ${videoPath}. Ensure the path is absolute and accessible. Skipping.`);
@@ -518,11 +543,17 @@ function toBase64VideoSource(
     const lookupType = mime.lookup(resolvedPath);
     const mimeType = typeof lookupType === 'string' ? lookupType : 'application/octet-stream';
 
-    return {
+    const source: Base64VideoSource = {
       type: 'base64',
       data: fileBuffer.toString('base64'),
       mimeType,
     };
+
+    if (wasRelative) {
+      warnings.push(`Successfully read ${resolvedPath}, originally provided as relative path "${videoPath}".`);
+    }
+
+    return source;
   } catch (error) {
     console.error(`Error reading video file ${resolvedPath}:`, error);
     return `Failed to read video file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
@@ -546,6 +577,17 @@ function logPartialFailures(errors: string[], kind: 'image' | 'video'): void {
   const uniqueErrors = Array.from(new Set(errors));
   for (const message of uniqueErrors) {
     console.warn(`Partial ${kind} path failure: ${message}`);
+  }
+}
+
+function logPathWarnings(warnings: string[], kind: 'image' | 'video'): void {
+  if (warnings.length === 0) {
+    return;
+  }
+
+  const uniqueWarnings = Array.from(new Set(warnings));
+  for (const message of uniqueWarnings) {
+    console.warn(`Relative ${kind} path warning: ${message}`);
   }
 }
 

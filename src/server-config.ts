@@ -29,7 +29,12 @@ export function isKnownToolName(value: string): value is ToolName {
     return (KNOWN_TOOL_NAMES as readonly string[]).includes(value);
 }
 
-export function resolveLocalPath(inputPath: string, options?: { quiet?: boolean }): string | null {
+export type ResolveLocalPathOptions = {
+    quiet?: boolean;
+    onRelative?: (absolutePath: string) => void;
+};
+
+export function resolveLocalPath(inputPath: string, options?: ResolveLocalPathOptions): string | null {
     if (typeof inputPath !== 'string') {
         return null;
     }
@@ -76,10 +81,9 @@ export function resolveLocalPath(inputPath: string, options?: { quiet?: boolean 
     }
 
     if (!isAbsolutePath(candidate)) {
-        if (!quiet) {
-            console.warn(`Relative paths are not supported: ${inputPath}. Provide an absolute path.`);
-        }
-        return null;
+        const resolved = path.resolve(candidate);
+        options?.onRelative?.(resolved);
+        candidate = resolved;
     }
 
     return path.normalize(candidate);
