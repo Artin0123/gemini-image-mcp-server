@@ -1,6 +1,5 @@
 # 依存関係
 node_modules/
-package-lock.json
 
 # ビルド出力
 dist/
@@ -24,4 +23,4 @@ test-image2.jpg
 test-video.mp4
 test-video2.mov
 
-.smithery
+.smithery/
