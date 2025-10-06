@@ -10,7 +10,9 @@
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "node --loader ts-node/esm --test tests/server-config.test.ts tests/gemini-media.test.ts",
-    "test:gemini": "node --loader ts-node/esm src/test-gemini.ts"
+    "test:gemini": "node --loader ts-node/esm src/test-gemini.ts",
+    "smithery:build": "smithery build",
+    "smithery:dev": "smithery dev"
   },
   "repository": {
     "type": "git",
@@ -25,17 +27,19 @@
   "homepage": "https://github.com/Artin0123/image-mcp-server-gemini#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@smithery/sdk": "^1.6.8",
     "@modelcontextprotocol/sdk": "^1.19.1",
+    "@smithery/sdk": "^1.6.8",
     "@types/node": "^24.6.2",
     "axios": "^1.12.2",
     "chalk": "^5.3.0",
     "dotenv": "^17.2.3",
     "mime-types": "^3.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@smithery/cli": "^1.4.6",
     "@types/mime-types": "^3.0.1"
   }
 }

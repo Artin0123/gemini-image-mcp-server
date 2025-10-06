@@ -53,6 +53,8 @@ Optional environment variables let you customise behaviour without code changes:
 - `GEMINI_MODEL`: Override the default Gemini model (defaults to `gemini-2.0-flash`).
 - `DISABLED_TOOLS` / `MCP_DISABLED_TOOLS`: Comma- or JSON-separated list of tool names to disable (e.g. `analyze_video`). Disabled tools are hidden from clients and respond with a configuration error if invoked directly.
 
+When deploying through Smithery's TypeScript runtime, these options are also surfaced in the hosted configuration UI. The server exports a schema requiring the Gemini API key and exposing optional `modelName` and `disabledTools` fields, so operators can manage them without editing environment variables.
+
 ## MCP Server Configuration
 
 To use with tools like Cline, add the following settings to your MCP server configuration file:
@@ -178,6 +180,12 @@ yarn add --dev @types/mime-types
 ```bash
 # Run in development mode
 npm run dev
+
+# Build a Smithery deployment bundle
+npm run smithery:build
+
+# Launch the Smithery CLI playground with hot reload
+npm run smithery:dev
 
 # Run unit tests (path resolution, configuration parsing, media prompts)
 npm test
