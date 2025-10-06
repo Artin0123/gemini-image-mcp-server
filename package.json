@@ -3,6 +3,7 @@
   "version": "1.2.0",
   "description": "MCP server for image and video analysis powered by Gemini 2.0 Flash",
   "main": "dist/index.js",
+  "module": "./src/index.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -24,9 +25,11 @@
   "homepage": "https://github.com/Artin0123/image-mcp-server-gemini#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@smithery/sdk": "^1.6.8",
     "@modelcontextprotocol/sdk": "^1.19.1",
     "@types/node": "^24.6.2",
     "axios": "^1.12.2",
+    "chalk": "^5.3.0",
     "dotenv": "^17.2.3",
     "mime-types": "^3.0.1",
     "ts-node": "^10.9.2",
