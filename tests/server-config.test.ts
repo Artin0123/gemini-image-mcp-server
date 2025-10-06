@@ -6,7 +6,6 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import {
     resolveLocalPath,
-    isPathAllowed,
     loadServerOptions,
     DEFAULT_MODEL_NAME,
 } from '../src/server-config.js';
@@ -26,11 +25,6 @@ test('resolveLocalPath resolves relative paths within the current working direct
     const resolved = resolveLocalPath('test.png');
     assert.ok(resolved, 'Relative path should resolve to an absolute location');
     assert.equal(resolved, path.normalize(testImagePath));
-
-    assert.ok(
-        isPathAllowed(resolved, tempDir),
-        'Resolved path should be allowed when under the workspace root'
-    );
 });
 
 test('resolveLocalPath supports file:// URLs', () => {
@@ -65,12 +59,11 @@ test('loadServerOptions honours environment overrides and sanitises tool names',
         };
 
         try {
-            const options = loadServerOptions(env, { workspaceRoot: tempDir });
+            const options = loadServerOptions(env);
 
             assert.equal(options.modelName, 'gemini-flash-lite-latest');
             assert.equal(options.disabledTools.size, 1);
             assert.ok(options.disabledTools.has('analyze_video'));
-            assert.equal(options.workspaceRoot, path.resolve(tempDir));
             assert.equal(warnings.length, 1);
         } finally {
             console.warn = originalWarn;
@@ -81,7 +74,7 @@ test('loadServerOptions honours environment overrides and sanitises tool names',
 });
 
 test('loadServerOptions falls back to default model when unset', () => {
-    const options = loadServerOptions({}, { workspaceRoot: process.cwd() });
+    const options = loadServerOptions({});
 
     assert.equal(options.modelName, DEFAULT_MODEL_NAME);
 });

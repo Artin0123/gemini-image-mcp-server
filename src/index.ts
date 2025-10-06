@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { config as dotenvConfig } from 'dotenv';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import * as mime from 'mime-types';
 import {
   GeminiMediaAnalyzer,
@@ -18,17 +21,76 @@ import {
   ToolName,
   KNOWN_TOOL_NAMES,
   isKnownToolName,
-  isPathAllowed,
   resolveLocalPath,
   loadServerOptions,
 } from './server-config.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
-dotenvConfig();
+loadEnvironmentVariables();
 
 const LOCAL_VIDEO_SIZE_LIMIT_MB = 25;
 
 const ToolNameSchema = z.enum(KNOWN_TOOL_NAMES as [ToolName, ...ToolName[]]);
+
+function loadEnvironmentVariables(): void {
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const searchRoots = [
+    process.cwd(),
+    scriptDir,
+    path.resolve(scriptDir, '..'),
+  ];
+
+  const tried = new Set<string>();
+  let loaded = false;
+  const override = shouldOverrideGeminiEnv();
+
+  for (const root of searchRoots) {
+    if (!root) {
+      continue;
+    }
+
+    const envPath = path.join(root, '.env');
+    if (tried.has(envPath)) {
+      continue;
+    }
+    tried.add(envPath);
+
+    if (!fs.existsSync(envPath)) {
+      continue;
+    }
+
+    const result = dotenvConfig({ path: envPath, override, quiet: true });
+    if (result.error) {
+      const error = result.error as NodeJS.ErrnoException;
+      const message = error?.message ?? String(result.error);
+      console.warn(`Failed to load environment variables from ${envPath}: ${message}`);
+      continue;
+    }
+
+    loaded = true;
+    break;
+  }
+
+  if (!loaded) {
+    const fallback = dotenvConfig({ quiet: true, override });
+    if (fallback.error) {
+      const error = fallback.error as NodeJS.ErrnoException;
+      if (error?.code !== 'ENOENT') {
+        const message = error?.message ?? String(fallback.error);
+        console.warn(`Failed to load environment variables via default lookup: ${message}`);
+      }
+    }
+  }
+}
+
+function shouldOverrideGeminiEnv(): boolean {
+  const current = process.env.GEMINI_API_KEY;
+  if (current === undefined) {
+    return true;
+  }
+
+  return current.trim().length === 0;
+}
 
 export const configSchema = z.object({
   geminiApiKey: z
@@ -94,7 +156,7 @@ const AnalyzeYouTubeArgsSchema = z.object({
   prompt: z.string().trim().optional(),
 });
 
-export default function createServer({ config, logger }: CreateServerArgs) {
+export function createGeminiMcpServer({ config, logger }: CreateServerArgs): McpServer {
   const geminiApiKey = (config.geminiApiKey ?? process.env.GEMINI_API_KEY)?.trim();
   if (!geminiApiKey) {
     throw new Error(
@@ -105,7 +167,6 @@ export default function createServer({ config, logger }: CreateServerArgs) {
   const baseOptions = loadServerOptions(process.env);
   const modelName = config.modelName?.trim() ?? baseOptions.modelName;
   const disabledTools = mergeDisabledTools(baseOptions.disabledTools, config.disabledTools ?? []);
-  const workspaceRoot = baseOptions.workspaceRoot;
 
   const analyzer = new GeminiMediaAnalyzer(new GoogleGenerativeAI(geminiApiKey), modelName);
   const server = new McpServer({
@@ -116,16 +177,20 @@ export default function createServer({ config, logger }: CreateServerArgs) {
 
   const log = logger ?? console;
   log.info?.(
-    `Gemini MCP server initialised (v${SERVER_VERSION}) | model=${modelName} | disabledTools=${formatDisabledTools(disabledTools)} | workspaceRoot=${workspaceRoot}`,
+    `Gemini MCP server initialised (v${SERVER_VERSION}) | model=${modelName} | disabledTools=${formatDisabledTools(disabledTools)}`,
   );
 
   registerImageUrlTool(server, analyzer, disabledTools);
-  registerImagePathTool(server, analyzer, disabledTools, workspaceRoot);
+  registerImagePathTool(server, analyzer, disabledTools);
   registerVideoUrlTool(server, analyzer, disabledTools);
-  registerVideoPathTool(server, analyzer, disabledTools, workspaceRoot);
+  registerVideoPathTool(server, analyzer, disabledTools);
   registerYouTubeTool(server, analyzer, disabledTools);
 
-  return server.server;
+  return server;
+}
+
+export default function createServer(args: CreateServerArgs) {
+  return createGeminiMcpServer(args).server;
 }
 
 function registerImageUrlTool(
@@ -152,7 +217,6 @@ function registerImagePathTool(
   server: McpServer,
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
-  workspaceRoot: string,
 ) {
   server.tool(
     'analyze_image_from_path',
@@ -160,14 +224,15 @@ function registerImagePathTool(
     AnalyzeImagePathArgsSchema.shape,
     async ({ imagePaths, prompt }: z.infer<typeof AnalyzeImagePathArgsSchema>) =>
       executeTool('analyze_image_from_path', disabledTools, async () => {
-        const imageSources = readImagesFromPaths(imagePaths, workspaceRoot);
-        if (imageSources.length === 0) {
+        const result = readImagesFromPaths(imagePaths);
+        if (result.sources.length === 0) {
           throw new McpError(
             ErrorCode.InvalidParams,
-            'No valid local image files could be processed from the provided paths.',
+            buildPathFailureMessage('image', result.errors),
           );
         }
-        return analyzer.analyzeImages(imageSources, prompt);
+        logPartialFailures(result.errors, 'image');
+        return analyzer.analyzeImages(result.sources, prompt);
       }),
   );
 }
@@ -196,7 +261,6 @@ function registerVideoPathTool(
   server: McpServer,
   analyzer: GeminiMediaAnalyzer,
   disabledTools: Set<ToolName>,
-  workspaceRoot: string,
 ) {
   server.tool(
     'analyze_video_from_path',
@@ -204,14 +268,15 @@ function registerVideoPathTool(
     AnalyzeVideoPathArgsSchema.shape,
     async ({ videoPaths, prompt }: z.infer<typeof AnalyzeVideoPathArgsSchema>) =>
       executeTool('analyze_video_from_path', disabledTools, async () => {
-        const videoSources = readVideosFromPaths(videoPaths, workspaceRoot);
-        if (videoSources.length === 0) {
+        const result = readVideosFromPaths(videoPaths);
+        if (result.sources.length === 0) {
           throw new McpError(
             ErrorCode.InvalidParams,
-            'No valid local video files could be processed from the provided paths.',
+            buildPathFailureMessage('video', result.errors),
           );
         }
-        return analyzer.analyzeVideos(videoSources, prompt);
+        logPartialFailures(result.errors, 'video');
+        return analyzer.analyzeVideos(result.sources, prompt);
       }),
   );
 }
@@ -310,48 +375,66 @@ function createErrorResponse(toolName: ToolName, error: unknown) {
   };
 }
 
-function readImagesFromPaths(imagePaths: string[], workspaceRoot: string): Base64ImageSource[] {
+type PathReadResult<T> = {
+  sources: T[];
+  errors: string[];
+};
+
+function readImagesFromPaths(
+  imagePaths: string[],
+): PathReadResult<Base64ImageSource> {
   const sources: Base64ImageSource[] = [];
+  const errors: string[] = [];
 
   for (const imagePath of imagePaths) {
-    const source = toBase64ImageSource(imagePath, workspaceRoot);
-    if (source) {
-      sources.push(source);
+    const outcome = toBase64ImageSource(imagePath);
+    if (typeof outcome === 'string') {
+      errors.push(outcome);
+      continue;
+    }
+
+    if (outcome) {
+      sources.push(outcome);
     }
   }
 
-  return sources;
+  return { sources, errors };
 }
 
-function readVideosFromPaths(videoPaths: string[], workspaceRoot: string): Base64VideoSource[] {
+function readVideosFromPaths(
+  videoPaths: string[],
+): PathReadResult<Base64VideoSource> {
   const sources: Base64VideoSource[] = [];
+  const errors: string[] = [];
 
   for (const videoPath of videoPaths) {
-    const source = toBase64VideoSource(videoPath, workspaceRoot);
-    if (source) {
-      sources.push(source);
+    const outcome = toBase64VideoSource(videoPath);
+    if (typeof outcome === 'string') {
+      errors.push(outcome);
+      continue;
+    }
+
+    if (outcome) {
+      sources.push(outcome);
     }
   }
 
-  return sources;
+  return { sources, errors };
 }
 
-function toBase64ImageSource(imagePath: string, workspaceRoot: string): Base64ImageSource | null {
+function toBase64ImageSource(
+  imagePath: string,
+): Base64ImageSource | string | null {
   const resolvedPath = resolveLocalPath(imagePath);
 
   if (!resolvedPath) {
     console.warn(`Could not resolve local image path: ${imagePath}. Skipping.`);
-    return null;
-  }
-
-  if (!isPathAllowed(resolvedPath, workspaceRoot)) {
-    console.warn(`Blocking access to disallowed path: ${resolvedPath}`);
-    return null;
+    return `Path could not be resolved: ${imagePath}`;
   }
 
   if (!fs.existsSync(resolvedPath)) {
     console.warn(`Image file not found: ${resolvedPath}. Skipping.`);
-    return null;
+    return `File not found: ${resolvedPath}`;
   }
 
   try {
@@ -359,7 +442,7 @@ function toBase64ImageSource(imagePath: string, workspaceRoot: string): Base64Im
 
     if (!stats.isFile()) {
       console.warn(`Path is not a regular file: ${resolvedPath}. Skipping.`);
-      return null;
+      return `Not a regular file: ${resolvedPath}`;
     }
 
     const fileBuffer = fs.readFileSync(resolvedPath);
@@ -368,7 +451,7 @@ function toBase64ImageSource(imagePath: string, workspaceRoot: string): Base64Im
 
     if (!mimeType.startsWith('image/')) {
       console.warn(`File is not an image: ${resolvedPath} (MIME: ${mimeType}). Skipping.`);
-      return null;
+      return `Unsupported image MIME type (${mimeType}) at ${resolvedPath}`;
     }
 
     return {
@@ -378,26 +461,23 @@ function toBase64ImageSource(imagePath: string, workspaceRoot: string): Base64Im
     };
   } catch (error) {
     console.error(`Error reading image file ${resolvedPath}:`, error);
-    return null;
+    return `Failed to read image file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 
-function toBase64VideoSource(videoPath: string, workspaceRoot: string): Base64VideoSource | null {
+function toBase64VideoSource(
+  videoPath: string,
+): Base64VideoSource | string | null {
   const resolvedPath = resolveLocalPath(videoPath);
 
   if (!resolvedPath) {
     console.warn(`Could not resolve local video path: ${videoPath}. Skipping.`);
-    return null;
-  }
-
-  if (!isPathAllowed(resolvedPath, workspaceRoot)) {
-    console.warn(`Blocking access to disallowed path: ${resolvedPath}`);
-    return null;
+    return `Path could not be resolved: ${videoPath}`;
   }
 
   if (!fs.existsSync(resolvedPath)) {
     console.warn(`Video file not found: ${resolvedPath}. Skipping.`);
-    return null;
+    return `File not found: ${resolvedPath}`;
   }
 
   try {
@@ -405,7 +485,7 @@ function toBase64VideoSource(videoPath: string, workspaceRoot: string): Base64Vi
 
     if (!stats.isFile()) {
       console.warn(`Path is not a regular file: ${resolvedPath}. Skipping.`);
-      return null;
+      return `Not a regular file: ${resolvedPath}`;
     }
 
     const fileSizeMB = stats.size / (1024 * 1024);
@@ -414,7 +494,7 @@ function toBase64VideoSource(videoPath: string, workspaceRoot: string): Base64Vi
       console.warn(
         `Skipping large video (~${fileSizeMB.toFixed(2)} MB > ${LOCAL_VIDEO_SIZE_LIMIT_MB} MB limit) from ${resolvedPath}.`,
       );
-      return null;
+      return `Video too large (~${fileSizeMB.toFixed(2)} MB) for inline upload: ${resolvedPath}`;
     }
 
     const fileBuffer = fs.readFileSync(resolvedPath);
@@ -428,6 +508,66 @@ function toBase64VideoSource(videoPath: string, workspaceRoot: string): Base64Vi
     };
   } catch (error) {
     console.error(`Error reading video file ${resolvedPath}:`, error);
-    return null;
+    return `Failed to read video file ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`;
   }
+}
+
+function buildPathFailureMessage(kind: 'image' | 'video', errors: string[]): string {
+  if (errors.length === 0) {
+    return `No valid local ${kind} files could be processed from the provided paths.`;
+  }
+
+  const uniqueErrors = Array.from(new Set(errors));
+  return `No valid local ${kind} files could be processed from the provided paths. Details: ${uniqueErrors.join('; ')}`;
+}
+
+function logPartialFailures(errors: string[], kind: 'image' | 'video'): void {
+  if (errors.length === 0) {
+    return;
+  }
+
+  const uniqueErrors = Array.from(new Set(errors));
+  for (const message of uniqueErrors) {
+    console.warn(`Partial ${kind} path failure: ${message}`);
+  }
+}
+
+function isExecutedDirectly(): boolean {
+  const entryPoint = process.argv[1];
+  if (!entryPoint) {
+    return false;
+  }
+
+  try {
+    const resolvedEntry = path.resolve(entryPoint);
+    const currentModulePath = fileURLToPath(import.meta.url);
+    return resolvedEntry === currentModulePath;
+  } catch {
+    return false;
+  }
+}
+
+async function startCliServer(): Promise<void> {
+  try {
+    const envApiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!envApiKey) {
+      console.error('GEMINI_API_KEY is required when running the MCP server directly.');
+      process.exit(1);
+    }
+
+    const server = createGeminiMcpServer({
+      config: { geminiApiKey: envApiKey },
+      logger: console,
+    });
+
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  } catch (error) {
+    console.error('Failed to start Gemini MCP server:', error);
+    process.exit(1);
+  }
+}
+
+if (isExecutedDirectly()) {
+  void startCliServer();
 }

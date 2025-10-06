@@ -12,7 +12,6 @@ export type ToolName =
 export type ServerOptions = {
     modelName: string;
     disabledTools: Set<ToolName>;
-    workspaceRoot: string;
 };
 
 export const SERVER_VERSION = '1.2.0';
@@ -28,13 +27,6 @@ export const KNOWN_TOOL_NAMES: readonly ToolName[] = [
 
 export function isKnownToolName(value: string): value is ToolName {
     return (KNOWN_TOOL_NAMES as readonly string[]).includes(value);
-}
-
-export function isPathAllowed(resolvedPath: string, workspaceRoot: string): boolean {
-    const normalizedRoot = path.resolve(workspaceRoot);
-    const normalizedPath = path.resolve(resolvedPath);
-    const relative = path.relative(normalizedRoot, normalizedPath);
-    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 export function resolveLocalPath(inputPath: string, options?: { quiet?: boolean }): string | null {
@@ -159,11 +151,7 @@ export function parseDisabledTools(raw: string | undefined): Set<ToolName> {
     return disabled;
 }
 
-export type LoadServerOptions = {
-    workspaceRoot?: string;
-};
-
-export function loadServerOptions(env: NodeJS.ProcessEnv, options: LoadServerOptions = {}): ServerOptions {
+export function loadServerOptions(env: NodeJS.ProcessEnv): ServerOptions {
     const modelCandidate =
         env.GEMINI_MODEL ?? env.GEMINI_MODEL_NAME ?? env.MCP_GEMINI_MODEL ?? env.GOOGLE_GEMINI_MODEL;
     const modelName = typeof modelCandidate === 'string' && modelCandidate.trim().length > 0
@@ -174,12 +162,8 @@ export function loadServerOptions(env: NodeJS.ProcessEnv, options: LoadServerOpt
         env.DISABLED_TOOLS ?? env.MCP_DISABLED_TOOLS ?? env.MCP_DISABLED_TOOL ?? env.GEMINI_DISABLED_TOOLS
     );
 
-    const workspaceRootCandidate = options.workspaceRoot ?? process.cwd();
-    const workspaceRoot = path.resolve(workspaceRootCandidate);
-
     return {
         modelName,
         disabledTools,
-        workspaceRoot,
     };
 }

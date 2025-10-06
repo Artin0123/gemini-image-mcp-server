@@ -2,7 +2,7 @@
 # image-mcp-server-gemini
 
 [![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
-An MCP server that receives image/video URLs or local file paths and analyzes their content using the Gemini 2.0 Flash model.(forked from github.com/champierre/image-mcp-server)
+An MCP server that receives image/video URLs or local file paths and analyzes their content using the Gemini models.
 
 ## Features
 
@@ -42,13 +42,51 @@ npm run build
 
 ## Configuration
 
-To use this server, you need a Gemini API key. Set the following environment variable:
+You need a Gemini API key before the server can talk to Google Gemini.
+
+1. Sign in with your Google account and visit [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. Create a new API key (Gemini 2.0 Flash works on the free tier in supported regions) and copy it somewhere safe. The `injecting env (0) from .env` console tip you may see is just advertising from the `dotenv` dependency—you **do not** need to register with dotenvx.
+
+### Provide the key to the server
+
+Pick whichever option fits your workflow:
+
+**Option A – `.env` file**
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-Optional environment variables let you customise behaviour without code changes:
+The server automatically looks for `.env` in the current working directory, the compiled `dist/` folder, and the project root, so it still picks up your secrets even if an MCP client launches the process from a different directory.
+
+**Option B – JSON configuration**
+
+Add the variables directly to your MCP configuration file. Supplying `cwd` keeps relative paths predictable and avoids `.env` discovery issues.
+
+```json
+{
+  "mcpServers": {
+    "image-video-analysis": {
+      "command": "node",
+      "args": ["/path/to/image-mcp-server-gemini/dist/index.js"],
+      "cwd": "/path/to/image-mcp-server-gemini",
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key",
+        "GEMINI_MODEL": "gemini-flash-lite-latest",
+        "MCP_DISABLED_TOOLS": "analyze_video"
+      }
+    }
+  }
+}
+```
+
+ Optional environment variables let you customise behaviour without code changes:
 
 - `GEMINI_MODEL`: Override the default Gemini model (defaults to `gemini-2.0-flash`).
 - `DISABLED_TOOLS` / `MCP_DISABLED_TOOLS`: Comma- or JSON-separated list of tool names to disable (e.g. `analyze_video`). Disabled tools are hidden from clients and respond with a configuration error if invoked directly.
@@ -68,7 +106,8 @@ Add the following to `cline_mcp_settings.json`:
   "mcpServers": {
     "image-video-analysis": { // Consider renaming for clarity
       "command": "node",
-      "args": ["/path/to/image-mcp-server/dist/index.js"],
+      "args": ["/path/to/image-mcp-server-gemini/dist/index.js"],
+      "cwd": "/path/to/image-mcp-server-gemini",
       "env": {
         "GEMINI_API_KEY": "your_gemini_api_key",
         "GEMINI_MODEL": "gemini-flash-lite-latest",
@@ -88,7 +127,8 @@ Add the following to `claude_desktop_config.json`:
   "mcpServers": {
     "image-video-analysis": { // Consider renaming for clarity
       "command": "node",
-      "args": ["/path/to/image-mcp-server/dist/index.js"],
+      "args": ["/path/to/image-mcp-server-gemini/dist/index.js"],
+      "cwd": "/path/to/image-mcp-server-gemini",
       "env": {
         "GEMINI_API_KEY": "your_gemini_api_key",
         "GEMINI_MODEL": "gemini-flash-lite-latest",
@@ -113,6 +153,10 @@ Once the MCP server is configured, the following tools become available:
   - Arguments: `videoPaths` (array of strings, required), `prompt` (string, optional).
 - `analyze_youtube_video`: Receives a single YouTube video URL and analyzes its content.
   - Arguments: `youtubeUrl` (string, required), `prompt` (string, optional).
+
+### Remote deployments
+
+When the server runs on Smithery or any other remote host, it cannot reach files that live on your local machine. Requests to the `..._from_path` tools must reference paths that exist on the remote host's filesystem; local-only paths will fail because the remote process has no access to them.
 
 ### Usage Examples
 
@@ -157,7 +201,7 @@ When using the `..._from_path` tools, the AI assistant (client) must specify **v
 
 **Path conversion is the responsibility of the AI assistant (or its execution environment).** The server will try to interpret the received path as is, applying basic security checks.
 
-Local files must live under the server's workspace root (the directory where the process starts, after resolving symlinks). Start the server from the folder that contains the media you want to expose, or restructure your project so relevant assets sit beneath that directory.
+The server will load any local media path that exists on the host machine, regardless of where the server process was started.
 
 ### Note: Type Errors During Build
 
