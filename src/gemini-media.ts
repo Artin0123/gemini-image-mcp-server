@@ -60,7 +60,7 @@ export class GeminiMediaAnalyzer {
         promptText: string = DEFAULT_IMAGE_PROMPT,
     ): Promise<string> {
         if (!Array.isArray(imageSources) || imageSources.length === 0) {
-            throw new Error('No image URLs provided.');
+            throw new Error('No image sources provided.');
         }
 
         try {

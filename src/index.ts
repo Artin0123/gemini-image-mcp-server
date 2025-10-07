@@ -45,30 +45,33 @@ type CreateServerArgs = {
   logger?: Logger;
 };
 
-const AnalyzeImageParamsSchema = {
+const AnalyzeImageInputSchema = {
   imageUrls: z
     .array(z.string().trim().url('Provide valid image URLs to analyze.'))
     .nonempty('Provide at least one image URL to analyze.'),
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeImageArgsSchema = z.object(AnalyzeImageParamsSchema);
+const AnalyzeImageSchema = z.object(AnalyzeImageInputSchema);
+type AnalyzeImageArgs = z.infer<typeof AnalyzeImageSchema>;
 
-const AnalyzeVideoParamsSchema = {
+const AnalyzeVideoInputSchema = {
   videoUrls: z
     .array(z.string().trim().url('Provide valid video URLs to analyze.'))
     .nonempty('Provide at least one video URL to analyze.'),
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeVideoArgsSchema = z.object(AnalyzeVideoParamsSchema);
+const AnalyzeVideoSchema = z.object(AnalyzeVideoInputSchema);
+type AnalyzeVideoArgs = z.infer<typeof AnalyzeVideoSchema>;
 
-const AnalyzeYouTubeParamsSchema = {
+const AnalyzeYouTubeInputSchema = {
   youtubeUrl: z.string().trim().url('A valid YouTube URL is required.'),
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeYouTubeArgsSchema = z.object(AnalyzeYouTubeParamsSchema);
+const AnalyzeYouTubeSchema = z.object(AnalyzeYouTubeInputSchema);
+type AnalyzeYouTubeArgs = z.infer<typeof AnalyzeYouTubeSchema>;
 
 export function createGeminiMcpServer({ config, logger }: CreateServerArgs): McpServer {
   const baseOptions = loadServerOptions(process.env);
@@ -120,18 +123,20 @@ function registerImageUrlTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server.tool(
+  server.registerTool(
     'analyze_image',
     {
       title: 'Analyze Image (URL)',
       description: 'Analyzes images available via URLs using Gemini API.',
-      readOnlyHint: true,
-      idempotentHint: true,
-      inputSchema: AnalyzeImageParamsSchema,
+      inputSchema: AnalyzeImageSchema as any,
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
-    async (call) =>
+    async (rawArgs: unknown) =>
       executeTool('analyze_image', async () => {
-        const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(call?.arguments ?? {});
+        const { imageUrls, prompt } = rawArgs as AnalyzeImageArgs;
         const analyzer = getAnalyzer();
         return analyzer.analyzeImageUrls(imageUrls, prompt);
       }),
@@ -142,18 +147,20 @@ function registerVideoUrlTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server.tool(
+  server.registerTool(
     'analyze_video',
     {
       title: 'Analyze Video (URL)',
       description: 'Analyzes videos accessible via URLs using Gemini API.',
-      readOnlyHint: true,
-      idempotentHint: true,
-      inputSchema: AnalyzeVideoParamsSchema,
+      inputSchema: AnalyzeVideoSchema as any,
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
-    async (call) =>
+    async (rawArgs: unknown) =>
       executeTool('analyze_video', async () => {
-        const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(call?.arguments ?? {});
+        const { videoUrls, prompt } = rawArgs as AnalyzeVideoArgs;
         const analyzer = getAnalyzer();
         return analyzer.analyzeVideoUrls(videoUrls, prompt);
       }),
@@ -164,18 +171,20 @@ function registerYouTubeTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server.tool(
+  server.registerTool(
     'analyze_youtube_video',
     {
       title: 'Analyze YouTube Video',
       description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
-      readOnlyHint: true,
-      idempotentHint: true,
-      inputSchema: AnalyzeYouTubeParamsSchema,
+      inputSchema: AnalyzeYouTubeSchema as any,
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
-    async (call) =>
+    async (rawArgs: unknown) =>
       executeTool('analyze_youtube_video', async () => {
-        const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(call?.arguments ?? {});
+        const { youtubeUrl, prompt } = rawArgs as AnalyzeYouTubeArgs;
         const analyzer = getAnalyzer();
         return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
       }),
