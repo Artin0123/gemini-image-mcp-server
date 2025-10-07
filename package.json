@@ -1,6 +1,6 @@
 {
   "name": "gemini-vision-mcp",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "MCP server for image and video analysis powered by Gemini API.",
   "main": "dist/index.js",
   "module": "./src/index.ts",

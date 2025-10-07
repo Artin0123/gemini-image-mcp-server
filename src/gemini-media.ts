@@ -1,11 +1,10 @@
 import { GoogleGenAI, Content, Part } from '@google/genai';
 
 export type UrlImageSource = { type: 'url'; data: string };
-export type UrlVideoSource = { type: 'url'; data: string };
 export type YouTubeVideoSource = { type: 'youtube'; data: string };
 
 export type ImageSource = UrlImageSource;
-export type VideoSource = UrlVideoSource | YouTubeVideoSource;
+export type VideoSource = YouTubeVideoSource;
 
 const DEFAULT_IMAGE_PROMPT =
     'Analyze the image content in detail and provide an explanation.';
@@ -13,6 +12,8 @@ const DEFAULT_VIDEO_PROMPT =
     'Analyze the video content in detail and provide an explanation.';
 const IMAGE_MIME_FALLBACK = 'image/*';
 const VIDEO_MIME_FALLBACK = 'video/*';
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const IMAGE_EXTENSION_TO_MIME = new Map<string, string>([
     ['.apng', 'image/apng'],
     ['.avif', 'image/avif'],
@@ -40,18 +41,6 @@ export class GeminiMediaAnalyzer {
 
         const sources: ImageSource[] = imageUrls.map((data) => ({ type: 'url', data }));
         return this.analyzeImages(sources, promptText);
-    }
-
-    async analyzeVideoUrls(
-        videoUrls: string[],
-        promptText: string = DEFAULT_VIDEO_PROMPT,
-    ): Promise<string> {
-        if (!Array.isArray(videoUrls) || videoUrls.length === 0) {
-            throw new Error('No video URLs provided.');
-        }
-
-        const sources: VideoSource[] = videoUrls.map((data) => ({ type: 'url', data }));
-        return this.analyzeVideos(sources, promptText);
     }
 
     async analyzeYouTubeVideo(
@@ -161,6 +150,14 @@ export class GeminiMediaAnalyzer {
                 const arrayBuffer = await response.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
 
+                // 檢查檔案大小
+                const fileSizeMB = buffer.length / (1024 * 1024);
+                if (buffer.length > MAX_FILE_SIZE_BYTES) {
+                    const errorMsg = `Image size ${fileSizeMB.toFixed(2)} MB exceeds maximum allowed size of ${MAX_FILE_SIZE_MB} MB`;
+                    console.warn(`Skipping large image from URL: ${source.data}`);
+                    throw new Error(errorMsg);
+                }
+
                 // 獲取 MIME type
                 const mimeType = response.headers.get('content-type')?.split(';')[0] ||
                     detectImageMimeType(source.data);
@@ -169,6 +166,8 @@ export class GeminiMediaAnalyzer {
                     console.warn(`Skipping non-image content from URL ${source.data}: ${mimeType}`);
                     return null;
                 }
+
+                console.log(`Image downloaded: ${fileSizeMB.toFixed(2)} MB (${mimeType})`);
 
                 // 轉換為 base64 並使用 inlineData
                 const base64Data = buffer.toString('base64');
@@ -179,7 +178,15 @@ export class GeminiMediaAnalyzer {
                     },
                 } satisfies Part;
             } catch (error) {
-                console.error(`Failed to fetch image URL: ${error instanceof Error ? error.message : String(error)}`);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+
+                // 如果是檔案大小超限錯誤,重新拋出讓用戶看到
+                if (errorMessage.includes('exceeds maximum allowed size')) {
+                    throw error;
+                }
+
+                // 其他錯誤記錄後返回 null
+                console.error(`Failed to fetch image URL: ${errorMessage}`);
                 return null;
             }
         }
@@ -195,7 +202,6 @@ export class GeminiMediaAnalyzer {
                 return null;
             }
 
-            // YouTube URL 可以直接使用 fileData
             return {
                 fileData: {
                     fileUri: source.data,
@@ -204,13 +210,7 @@ export class GeminiMediaAnalyzer {
             } satisfies Part;
         }
 
-        if (source.type !== 'url') {
-            console.warn(`Ignoring unsupported video source type at index ${index}.`);
-            return null;
-        }
-
-        // 普通 HTTP URL 視頻目前不支援(需要 Files API 上傳)
-        console.warn(`HTTP URL videos are not supported. Only YouTube URLs are supported for videos. Skipping: ${source.data}`);
+        console.warn(`Ignoring unsupported video source type at index ${index}.`);
         return null;
     }
 }

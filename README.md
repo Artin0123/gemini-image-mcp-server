@@ -1,13 +1,14 @@
 # image-mcp-server-gemini
 
 [![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
-> analyzing remote images and videos with Google Gemini.
 
 ## Features
 
 - Analyze one or more image URLs with a single tool call.
-- Analyze remote video URLs (including YouTube) without downloading files locally.
+- Analyze YouTube videos without downloading files locally.
 - Simple configuration: supply an API key and optionally override the Gemini model via a single environment variable.
+- **File size limit**: Images are limited to 10 MB to ensure fast processing.
+- **YouTube videos**: No size limit as they are streamed directly by Gemini API.
 
 ## Installation
 
@@ -37,14 +38,14 @@ npm run build
 
 Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide `GEMINI_API_KEY` to the server.
 
-Most MCP clients let you inject these values directly in their configuration. Example Smithery entry:
+Most MCP clients let you inject these values directly in their configuration:
 
 ```json
 {
   "mcpServers": {
     "gemini-media": {
       "command": "node",
-      "args": ["/absolute/path/to/image-mcp-server-gemini/dist/index.js"],
+      "args": ["/absolute/path/to/gemini-vision-mcp/dist/index.js"],
       "env": {
         "GEMINI_API_KEY": "your_api_key_here",
         "GEMINI_MODEL": "models/gemini-flash-lite-latest"
@@ -64,20 +65,17 @@ The server defaults to `models/gemini-flash-lite-latest`. Override it by either:
 
 ## Available tools
 
-- `analyze_image`: Analyze one or more image URLs.
-- `analyze_video`: Analyze one or more video URLs.
-- `analyze_youtube_video`: Analyze a single YouTube video URL.
+- `analyze_image`: Analyze one or more image URLs. **Maximum file size: 10 MB per image.**
+- `analyze_youtube_video`: Analyze a YouTube video from URL. No size limit.
 
-All tools treat URLs as remote references and forward them directly to Gemini, inferring MIME types from file extensions (falling back to `image/*` or `video/*` when unknown). No files are downloaded or uploaded by this server.
+Image URLs are downloaded and processed with a 10 MB size limit to ensure fast response times. Files exceeding this limit will result in an error message indicating the actual file size.
+
+YouTube videos are streamed directly by Gemini API without downloading, so there is no size restriction.
 
 ### Prompt examples
 
 ```
-Please analyze this product photo: https://example.com/images/catalog-item.png
-```
-
-```
-Summarize the key moments in this event recap: https://example.com/videos/highlights.mp4
+Please analyze this product photo: https://teimg-bgr.pages.dev/file/mvYT6KeF.webp
 ```
 
 ```

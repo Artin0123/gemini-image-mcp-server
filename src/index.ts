@@ -12,7 +12,7 @@ import {
 } from './server-config.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
-const TOOL_NAMES = ['analyze_image', 'analyze_video', 'analyze_youtube'] as const;
+const TOOL_NAMES = ['analyze_image', 'analyze_youtube_video'] as const;
 type ToolName = (typeof TOOL_NAMES)[number];
 
 export const configSchema = z
@@ -77,16 +77,6 @@ const AnalyzeImageInputSchema = {
 const AnalyzeImageSchema = z.object(AnalyzeImageInputSchema).strict();
 type AnalyzeImageArgs = z.infer<typeof AnalyzeImageSchema>;
 
-const AnalyzeVideoInputSchema = {
-  videoUrls: z
-    .array(z.string().trim().url('Provide valid video URLs to analyze.'))
-    .nonempty('Provide at least one video URL to analyze.'),
-  prompt: z.string().trim().optional(),
-} satisfies z.ZodRawShape;
-
-const AnalyzeVideoSchema = z.object(AnalyzeVideoInputSchema).strict();
-type AnalyzeVideoArgs = z.infer<typeof AnalyzeVideoSchema>;
-
 const AnalyzeYouTubeInputSchema = {
   youtubeUrl: z.string().trim().url('A valid YouTube URL is required.'),
   prompt: z.string().trim().optional(),
@@ -123,7 +113,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs = {})
     return analyzer;
   };
   const server = new McpServer({
-    name: 'gemini-image-mcp-server',
+    name: 'gemini-vision-mcp',
     version: SERVER_VERSION,
     description: 'Analyze images and videos with Gemini API.',
     configuration: {
@@ -137,8 +127,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs = {})
   );
 
   registerImageUrlTool(server, getAnalyzer);
-  registerVideoUrlTool(server, getAnalyzer);
-  registerYouTubeTool(server, getAnalyzer);
+  registerYouTubeVideoTool(server, getAnalyzer);
 
   return server;
 }
@@ -155,7 +144,7 @@ function registerImageUrlTool(
     'analyze_image',
     {
       title: 'Analyze URL Image',
-      description: 'Analyzes images available via URLs using Gemini API.',
+      description: 'Analyzes images available via URLs using Gemini API. Maximum file size: 10 MB.',
       inputSchema: AnalyzeImageSchema.shape,
       annotations: {
         readOnlyHint: true,
@@ -171,39 +160,15 @@ function registerImageUrlTool(
   );
 }
 
-function registerVideoUrlTool(
+function registerYouTubeVideoTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
   server.registerTool(
-    'analyze_video',
-    {
-      title: 'Analyze URL Video',
-      description: 'Analyzes videos from URLs using Gemini API. Currently only YouTube URLs are supported.',
-      inputSchema: AnalyzeVideoSchema.shape,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-    },
-    async (rawArgs: unknown) =>
-      executeTool('analyze_video', async () => {
-        const { videoUrls, prompt } = AnalyzeVideoSchema.parse(rawArgs);
-        const analyzer = getAnalyzer();
-        return analyzer.analyzeVideoUrls(videoUrls, prompt);
-      }),
-  );
-}
-
-function registerYouTubeTool(
-  server: McpServer,
-  getAnalyzer: () => GeminiMediaAnalyzer,
-) {
-  server.registerTool(
-    'analyze_youtube',
+    'analyze_youtube_video',
     {
       title: 'Analyze YouTube Video',
-      description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
+      description: 'Analyzes a YouTube video from URL using Gemini API. No size limit.',
       inputSchema: AnalyzeYouTubeSchema.shape,
       annotations: {
         readOnlyHint: true,
@@ -211,7 +176,7 @@ function registerYouTubeTool(
       },
     },
     async (rawArgs: unknown) =>
-      executeTool('analyze_youtube', async () => {
+      executeTool('analyze_youtube_video', async () => {
         const { youtubeUrl, prompt } = AnalyzeYouTubeSchema.parse(rawArgs);
         const analyzer = getAnalyzer();
         return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);

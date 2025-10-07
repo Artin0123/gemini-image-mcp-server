@@ -40,13 +40,12 @@ test('createGeminiMcpServer initializes with correct configuration schema', () =
     });
 });
 
-test('createGeminiMcpServer registers analyze_image tool', () => {
+test('createGeminiMcpServer registers all tools', () => {
     const server = createGeminiMcpServer({
         config: { geminiApiKey: 'test-key' },
     });
 
     const tools = (server as any)._registeredTools;
     assert.ok(tools['analyze_image']);
-    assert.ok(tools['analyze_video']);
     assert.ok(tools['analyze_youtube_video']);
 });
