@@ -1,7 +1,7 @@
 {
   "name": "gemini-image-mcp-server",
-  "version": "1.2.0",
-  "description": "MCP server for image and video analysis powered by Gemini 2.0 Flash",
+  "version": "1.3.0",
+  "description": "MCP server for image and video analysis powered by Gemini API.",
   "main": "dist/index.js",
   "module": "./src/index.ts",
   "type": "module",
@@ -9,9 +9,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});\"",
     "build": "npm run clean --silent && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "dev": "node --loader ts-node/esm src/index.ts",
     "test": "node --loader ts-node/esm --test tests/server-config.test.ts tests/gemini-media.test.ts",
-    "test:gemini": "node --loader ts-node/esm src/test-gemini.ts",
     "smithery:build": "smithery build",
     "smithery:dev": "smithery dev"
   },
@@ -31,15 +29,11 @@
     "@modelcontextprotocol/sdk": "^1.19.1",
     "@smithery/sdk": "^1.6.8",
     "@types/node": "^24.7.0",
-    "axios": "^1.12.2",
-    "dotenv": "^17.2.3",
-    "mime-types": "^3.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "zod": "^3.25.76"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@smithery/cli": "^1.4.6",
-    "@types/mime-types": "^3.0.1"
+    "@smithery/cli": "^1.4.6"
   }
 }
