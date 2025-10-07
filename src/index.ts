@@ -14,22 +14,41 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 const TOOL_NAMES = ['analyze_image', 'analyze_video', 'analyze_youtube_video'] as const;
 type ToolName = (typeof TOOL_NAMES)[number];
 
-export const configSchema = z.object({
-  geminiApiKey: z
-    .string()
-    .trim()
-    .min(1, 'A Gemini API key is required to connect to Google Gemini.')
-    .optional()
-    .describe(
-      'Your Google Gemini API key for image and video analysis. Falls back to GEMINI_API_KEY when omitted.',
-    ),
-  modelName: z
-    .string()
-    .trim()
-    .min(1, 'Model name cannot be empty.')
-    .optional()
-    .describe('Optional Gemini model name override. Defaults to gemini-flash-lite-latest.'),
-});
+export const configSchema = z
+  .object({
+    geminiApiKey: z
+      .string()
+      .trim()
+      .min(1, 'A Gemini API key is required to connect to Google Gemini.')
+      .optional()
+      .describe(
+        'Your Google Gemini API key for image and video analysis. Falls back to GEMINI_API_KEY when omitted.',
+      ),
+    modelName: z
+      .string()
+      .trim()
+      .min(1, 'Model name cannot be empty.')
+      .optional()
+      .describe('Optional Gemini model name override. Defaults to gemini-flash-lite-latest.'),
+  })
+  .passthrough();
+
+const configJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    geminiApiKey: {
+      type: 'string',
+      description:
+        'Your Google Gemini API key for image and video analysis. Falls back to GEMINI_API_KEY when omitted.',
+    },
+    modelName: {
+      type: 'string',
+      description: 'Optional Gemini model name override. Defaults to gemini-flash-lite-latest.',
+    },
+  },
+  required: [],
+} as const;
 
 type Config = z.infer<typeof configSchema>;
 
@@ -41,7 +60,7 @@ type Logger = {
 };
 
 type CreateServerArgs = {
-  config: Config;
+  config?: unknown;
   logger?: Logger;
 };
 
@@ -52,7 +71,7 @@ const AnalyzeImageInputSchema = {
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeImageSchema = z.object(AnalyzeImageInputSchema);
+const AnalyzeImageSchema = z.object(AnalyzeImageInputSchema).strict();
 type AnalyzeImageArgs = z.infer<typeof AnalyzeImageSchema>;
 
 const AnalyzeVideoInputSchema = {
@@ -62,7 +81,7 @@ const AnalyzeVideoInputSchema = {
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeVideoSchema = z.object(AnalyzeVideoInputSchema);
+const AnalyzeVideoSchema = z.object(AnalyzeVideoInputSchema).strict();
 type AnalyzeVideoArgs = z.infer<typeof AnalyzeVideoSchema>;
 
 const AnalyzeYouTubeInputSchema = {
@@ -70,15 +89,15 @@ const AnalyzeYouTubeInputSchema = {
   prompt: z.string().trim().optional(),
 } satisfies z.ZodRawShape;
 
-const AnalyzeYouTubeSchema = z.object(AnalyzeYouTubeInputSchema);
+const AnalyzeYouTubeSchema = z.object(AnalyzeYouTubeInputSchema).strict();
 type AnalyzeYouTubeArgs = z.infer<typeof AnalyzeYouTubeSchema>;
 
-export function createGeminiMcpServer({ config, logger }: CreateServerArgs): McpServer {
+export function createGeminiMcpServer({ config, logger }: CreateServerArgs = {}): McpServer {
+  const normalizedConfig = configSchema.parse(config ?? {});
   const baseOptions = loadServerOptions(process.env);
-  const modelName = config.modelName?.trim() ?? baseOptions.modelName;
+  const modelName = normalizedConfig.modelName ?? baseOptions.modelName;
   const resolveGeminiApiKey = () =>
-    config.geminiApiKey?.trim() ??
-    process.env.GEMINI_API_KEY?.trim();
+    normalizedConfig.geminiApiKey ?? process.env.GEMINI_API_KEY?.trim();
 
   let analyzer: GeminiMediaAnalyzer | null = null;
   const getAnalyzer = () => {
@@ -101,6 +120,9 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
     name: 'gemini-image-mcp-server',
     version: SERVER_VERSION,
     description: 'Analyze images and videos with Gemini API.',
+    configuration: {
+      schema: configJsonSchema,
+    },
   });
 
   const log = logger ?? console;
@@ -115,7 +137,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
   return server;
 }
 
-export default function createServer(args: CreateServerArgs) {
+export default function createServer(args: CreateServerArgs = {}) {
   return createGeminiMcpServer(args).server;
 }
 
@@ -128,7 +150,7 @@ function registerImageUrlTool(
     {
       title: 'Analyze Image (URL)',
       description: 'Analyzes images available via URLs using Gemini API.',
-      inputSchema: AnalyzeImageSchema as any,
+      inputSchema: AnalyzeImageSchema.shape,
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -136,7 +158,7 @@ function registerImageUrlTool(
     },
     async (rawArgs: unknown) =>
       executeTool('analyze_image', async () => {
-        const { imageUrls, prompt } = rawArgs as AnalyzeImageArgs;
+        const { imageUrls, prompt } = AnalyzeImageSchema.parse(rawArgs);
         const analyzer = getAnalyzer();
         return analyzer.analyzeImageUrls(imageUrls, prompt);
       }),
@@ -152,7 +174,7 @@ function registerVideoUrlTool(
     {
       title: 'Analyze Video (URL)',
       description: 'Analyzes videos accessible via URLs using Gemini API.',
-      inputSchema: AnalyzeVideoSchema as any,
+      inputSchema: AnalyzeVideoSchema.shape,
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -160,7 +182,7 @@ function registerVideoUrlTool(
     },
     async (rawArgs: unknown) =>
       executeTool('analyze_video', async () => {
-        const { videoUrls, prompt } = rawArgs as AnalyzeVideoArgs;
+        const { videoUrls, prompt } = AnalyzeVideoSchema.parse(rawArgs);
         const analyzer = getAnalyzer();
         return analyzer.analyzeVideoUrls(videoUrls, prompt);
       }),
@@ -176,7 +198,7 @@ function registerYouTubeTool(
     {
       title: 'Analyze YouTube Video',
       description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
-      inputSchema: AnalyzeYouTubeSchema as any,
+      inputSchema: AnalyzeYouTubeSchema.shape,
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -184,7 +206,7 @@ function registerYouTubeTool(
     },
     async (rawArgs: unknown) =>
       executeTool('analyze_youtube_video', async () => {
-        const { youtubeUrl, prompt } = rawArgs as AnalyzeYouTubeArgs;
+        const { youtubeUrl, prompt } = AnalyzeYouTubeSchema.parse(rawArgs);
         const analyzer = getAnalyzer();
         return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
       }),

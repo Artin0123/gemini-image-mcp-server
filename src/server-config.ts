@@ -2,7 +2,7 @@ export type ServerOptions = {
     modelName: string;
 };
 
-export const SERVER_VERSION = '1.3.2';
+export const SERVER_VERSION = '1.3.3';
 export const DEFAULT_MODEL_NAME = 'gemini-flash-lite-latest';
 export const MODEL_ENV_VAR = 'MCP_GEMINI_MODEL';
 
