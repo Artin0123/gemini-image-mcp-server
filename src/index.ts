@@ -129,9 +129,9 @@ function registerImageUrlTool(
       idempotentHint: true,
       inputSchema: AnalyzeImageParamsSchema,
     },
-    async (args) =>
+    async (call) =>
       executeTool('analyze_image', async () => {
-        const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(args);
+        const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(call?.arguments ?? {});
         const analyzer = getAnalyzer();
         return analyzer.analyzeImageUrls(imageUrls, prompt);
       }),
@@ -151,9 +151,9 @@ function registerVideoUrlTool(
       idempotentHint: true,
       inputSchema: AnalyzeVideoParamsSchema,
     },
-    async (args) =>
+    async (call) =>
       executeTool('analyze_video', async () => {
-        const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(args);
+        const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(call?.arguments ?? {});
         const analyzer = getAnalyzer();
         return analyzer.analyzeVideoUrls(videoUrls, prompt);
       }),
@@ -173,9 +173,9 @@ function registerYouTubeTool(
       idempotentHint: true,
       inputSchema: AnalyzeYouTubeParamsSchema,
     },
-    async (args) =>
+    async (call) =>
       executeTool('analyze_youtube_video', async () => {
-        const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(args);
+        const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(call?.arguments ?? {});
         const analyzer = getAnalyzer();
         return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
       }),

@@ -1,1 +1,15 @@
 runtime: typescript
+
+config:
+  type: object
+  properties:
+    geminiApiKey:
+      type: string
+      title: Gemini API Key
+      description: "Use environment variable GEMINI_API_KEY if left empty."
+    modelName:
+      type: string
+      title: Gemini Model Name
+      default: gemini-flash-lite-latest
+      description: "Use default model if left empty."
+  required: []

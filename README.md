@@ -23,8 +23,8 @@ npx -y @smithery/cli install @Artin0123/gemini-image-mcp-server --client claude
 
 ```bash
 # Clone the repository
-git clone https://github.com/Artin0123/image-mcp-server-gemini.git
-cd image-mcp-server-gemini
+git clone https://github.com/Artin0123/gemini-vision-mcp.git
+cd gemini-vision-mcp
 
 # Install dependencies
 npm install
@@ -60,10 +60,7 @@ If no key is supplied, the server can still start (handy for automated scans), b
 
 The server defaults to `gemini-flash-lite-latest`. Override it by either:
 
-- Setting the `MCP_GEMINI_MODEL` environment variable, or
-- Providing `modelName` in the Smithery/SDK configuration schema.
-
-Any other historical variable names (e.g. `GEMINI_MODEL`, `GEMINI_MODEL_NAME`, `GOOGLE_GEMINI_MODEL`) are no longer recognised.
+> Setting the `MCP_GEMINI_MODEL` environment variable, or Providing `modelName` in the Smithery/SDK configuration schema.
 
 ## Available tools
 
