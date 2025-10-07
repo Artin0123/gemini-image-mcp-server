@@ -4,13 +4,10 @@ export type ServerOptions = {
 
 export const SERVER_VERSION = '1.3.0';
 export const DEFAULT_MODEL_NAME = 'gemini-flash-lite-latest';
+export const MODEL_ENV_VAR = 'MCP_GEMINI_MODEL';
 
 export function loadServerOptions(env: NodeJS.ProcessEnv): ServerOptions {
-    const modelCandidate =
-        env.GEMINI_MODEL ??
-        env.GEMINI_MODEL_NAME ??
-        env.MCP_GEMINI_MODEL ??
-        env.GOOGLE_GEMINI_MODEL;
+    const modelCandidate = env[MODEL_ENV_VAR];
 
     const modelName =
         typeof modelCandidate === 'string' && modelCandidate.trim().length > 0

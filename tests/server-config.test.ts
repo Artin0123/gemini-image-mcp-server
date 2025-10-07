@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {
     loadServerOptions,
     DEFAULT_MODEL_NAME,
+    MODEL_ENV_VAR,
 } from '../src/server-config.js';
 
 test('loadServerOptions honours environment model override', () => {
     const env: NodeJS.ProcessEnv = {
-        GEMINI_MODEL: 'gemini-flash-lite-latest',
+        [MODEL_ENV_VAR]: 'gemini-flash-lite-latest',
     };
 
     const options = loadServerOptions(env);

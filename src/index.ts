@@ -71,21 +71,30 @@ const AnalyzeYouTubeParamsSchema = {
 const AnalyzeYouTubeArgsSchema = z.object(AnalyzeYouTubeParamsSchema);
 
 export function createGeminiMcpServer({ config, logger }: CreateServerArgs): McpServer {
-  const geminiApiKey =
+  const baseOptions = loadServerOptions(process.env);
+  const modelName = config.modelName?.trim() ?? baseOptions.modelName;
+  const resolveGeminiApiKey = () =>
     config.geminiApiKey?.trim() ??
     process.env.GEMINI_API_KEY?.trim() ??
     process.env.GOOGLE_API_KEY?.trim();
 
-  if (!geminiApiKey) {
-    throw new Error(
-      'Gemini API key missing. Provide geminiApiKey in the Smithery configuration or set GEMINI_API_KEY/GOOGLE_API_KEY in the environment.',
-    );
-  }
+  let analyzer: GeminiMediaAnalyzer | null = null;
+  const getAnalyzer = () => {
+    if (analyzer) {
+      return analyzer;
+    }
 
-  const baseOptions = loadServerOptions(process.env);
-  const modelName = config.modelName?.trim() ?? baseOptions.modelName;
+    const geminiApiKey = resolveGeminiApiKey();
+    if (!geminiApiKey) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        'Gemini API key missing. Provide geminiApiKey in the Smithery configuration or set GEMINI_API_KEY/GOOGLE_API_KEY in the environment.',
+      );
+    }
 
-  const analyzer = new GeminiMediaAnalyzer(new GoogleGenAI({ apiKey: geminiApiKey }), modelName);
+    analyzer = new GeminiMediaAnalyzer(new GoogleGenAI({ apiKey: geminiApiKey }), modelName);
+    return analyzer;
+  };
   const server = new McpServer({
     name: 'gemini-image-mcp-server',
     version: SERVER_VERSION,
@@ -97,9 +106,9 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
     `Gemini MCP server initialised (v${SERVER_VERSION}) | model=${modelName}`,
   );
 
-  registerImageUrlTool(server, analyzer);
-  registerVideoUrlTool(server, analyzer);
-  registerYouTubeTool(server, analyzer);
+  registerImageUrlTool(server, getAnalyzer);
+  registerVideoUrlTool(server, getAnalyzer);
+  registerYouTubeTool(server, getAnalyzer);
 
   return server;
 }
@@ -110,7 +119,7 @@ export default function createServer(args: CreateServerArgs) {
 
 function registerImageUrlTool(
   server: McpServer,
-  analyzer: GeminiMediaAnalyzer,
+  getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
   server
     .tool(
@@ -124,6 +133,7 @@ function registerImageUrlTool(
       async (args) =>
         executeTool('analyze_image', async () => {
           const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(args);
+          const analyzer = getAnalyzer();
           return analyzer.analyzeImageUrls(imageUrls, prompt);
         }),
     )
@@ -134,7 +144,7 @@ function registerImageUrlTool(
 
 function registerVideoUrlTool(
   server: McpServer,
-  analyzer: GeminiMediaAnalyzer,
+  getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
   server
     .tool(
@@ -148,6 +158,7 @@ function registerVideoUrlTool(
       async (args) =>
         executeTool('analyze_video', async () => {
           const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(args);
+          const analyzer = getAnalyzer();
           return analyzer.analyzeVideoUrls(videoUrls, prompt);
         }),
     )
@@ -158,7 +169,7 @@ function registerVideoUrlTool(
 
 function registerYouTubeTool(
   server: McpServer,
-  analyzer: GeminiMediaAnalyzer,
+  getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
   server
     .tool(
@@ -172,6 +183,7 @@ function registerYouTubeTool(
       async (args) =>
         executeTool('analyze_youtube_video', async () => {
           const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(args);
+          const analyzer = getAnalyzer();
           return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
         }),
     )
