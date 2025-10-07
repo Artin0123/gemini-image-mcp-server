@@ -1,7 +1,7 @@
 # image-mcp-server-gemini
 
 [![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
-> Minimal MCP server for analyzing remote images and videos with Google Gemini.
+> analyzing remote images and videos with Google Gemini.
 
 ## Features
 
@@ -35,10 +35,7 @@ npm run build
 
 ## Configuration
 
-Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide it to the server. Two environment variable names are supported for convenience:
-
-- `GEMINI_API_KEY`
-- `GOOGLE_API_KEY`
+Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide `GEMINI_API_KEY` it to the server.
 
 Most MCP clients let you inject these values directly in their configuration. Example Smithery entry:
 

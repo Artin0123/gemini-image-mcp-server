@@ -21,7 +21,7 @@ export const configSchema = z.object({
     .min(1, 'A Gemini API key is required to connect to Google Gemini.')
     .optional()
     .describe(
-      'Your Google Gemini API key for image and video analysis. Falls back to GEMINI_API_KEY or GOOGLE_API_KEY when omitted.',
+      'Your Google Gemini API key for image and video analysis. Falls back to GEMINI_API_KEY when omitted.',
     ),
   modelName: z
     .string()
@@ -75,8 +75,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
   const modelName = config.modelName?.trim() ?? baseOptions.modelName;
   const resolveGeminiApiKey = () =>
     config.geminiApiKey?.trim() ??
-    process.env.GEMINI_API_KEY?.trim() ??
-    process.env.GOOGLE_API_KEY?.trim();
+    process.env.GEMINI_API_KEY?.trim();
 
   let analyzer: GeminiMediaAnalyzer | null = null;
   const getAnalyzer = () => {
@@ -88,7 +87,7 @@ export function createGeminiMcpServer({ config, logger }: CreateServerArgs): Mcp
     if (!geminiApiKey) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        'Gemini API key missing. Provide geminiApiKey in the Smithery configuration or set GEMINI_API_KEY/GOOGLE_API_KEY in the environment.',
+        'Gemini API key missing. Provide geminiApiKey in the Smithery configuration or set GEMINI_API_KEY in the environment.',
       );
     }
 
