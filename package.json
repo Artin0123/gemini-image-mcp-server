@@ -15,15 +15,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Artin0123/image-mcp-server-gemini.git"
+    "url": "git+https://github.com/Artin0123/gemini-vision-mcp.git"
   },
   "keywords": [],
   "author": "Artin",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Artin0123/image-mcp-server-gemini/issues"
+    "url": "https://github.com/Artin0123/gemini-vision-mcp/issues"
   },
-  "homepage": "https://github.com/Artin0123/gemini-image-mcp-server/tree/remote#readme",
+  "homepage": "https://github.com/Artin0123/gemini-vision-mcp/tree/remote#readme",
   "dependencies": {
     "@google/genai": "^1.22.0",
     "@modelcontextprotocol/sdk": "^1.19.1",
