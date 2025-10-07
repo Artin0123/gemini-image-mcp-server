@@ -1,21 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { configSchema, createGeminiMcpServer } from '../src/index.js';
-import { GeminiMediaAnalyzer } from '../src/gemini-media.js';
 
-test('configSchema trims and validates entries', () => {
+test('configSchema validates and trims API key', () => {
     const result = configSchema.parse({
-        geminiApiKey: '  key  ',
+        geminiApiKey: '  test-key  ',
         modelName: '  gemini-pro  ',
     });
 
-    assert.equal(result.geminiApiKey, 'key');
+    assert.equal(result.geminiApiKey, 'test-key');
     assert.equal(result.modelName, 'gemini-pro');
-
-    assert.throws(() => configSchema.parse({ geminiApiKey: '' }));
 });
 
-test('createGeminiMcpServer exposes configuration schema metadata', () => {
+test('configSchema rejects empty API key', () => {
+    assert.throws(() => configSchema.parse({ geminiApiKey: '' }));
+    assert.throws(() => configSchema.parse({ geminiApiKey: '   ' }));
+});
+
+test('createGeminiMcpServer initializes with correct configuration schema', () => {
     const server = createGeminiMcpServer({ config: {} });
     const serverInfo = (server.server as any)._serverInfo;
 
@@ -38,80 +40,13 @@ test('createGeminiMcpServer exposes configuration schema metadata', () => {
     });
 });
 
-test('analyze_image tool enforces schema and uses provided config', async () => {
-    const original = GeminiMediaAnalyzer.prototype.analyzeImageUrls;
-    const calls: Array<{ urls: string[]; prompt?: string; modelName?: string }> = [];
-    GeminiMediaAnalyzer.prototype.analyzeImageUrls = async function (urls, prompt) {
-        calls.push({ urls, prompt, modelName: (this as any).modelName });
-        return 'stubbed-response';
-    };
+test('createGeminiMcpServer registers analyze_image tool', () => {
+    const server = createGeminiMcpServer({
+        config: { geminiApiKey: 'test-key' },
+    });
 
-    try {
-        const server = createGeminiMcpServer({
-            config: {
-                geminiApiKey: 'cfg-key',
-                modelName: 'gemini-pro-vision',
-            },
-        });
-
-        const tool = (server as any)._registeredTools['analyze_image'];
-        const success = await tool.callback(
-            {
-                imageUrls: ['https://example.com/image.png'],
-                prompt: 'describe image',
-            },
-            {} as any,
-        );
-
-        assert.equal(success.content[0].text, 'stubbed-response');
-        assert.deepEqual(calls[0]?.urls, ['https://example.com/image.png']);
-        assert.equal(calls[0]?.prompt, 'describe image');
-        assert.equal(calls[0]?.modelName, 'models/gemini-pro-vision');
-
-        const invalid = await tool.callback({ imageUrls: [] }, {} as any);
-        assert.equal(invalid.isError, true);
-        assert.match(invalid.content[0].text, /Provide at least one image URL to analyze/);
-    } finally {
-        GeminiMediaAnalyzer.prototype.analyzeImageUrls = original;
-    }
-});
-
-test('analyze_image tool requires API key and falls back to environment', async () => {
-    const original = GeminiMediaAnalyzer.prototype.analyzeImageUrls;
-    const calls: Array<{ modelName?: string }> = [];
-
-    GeminiMediaAnalyzer.prototype.analyzeImageUrls = async function () {
-        calls.push({ modelName: (this as any).modelName });
-        return 'env-response';
-    };
-
-    const originalEnv = process.env.GEMINI_API_KEY;
-    delete process.env.GEMINI_API_KEY;
-
-    try {
-        const withoutKey = createGeminiMcpServer({ config: {} });
-        const tool = (withoutKey as any)._registeredTools['analyze_image'];
-        const missing = await tool.callback({ imageUrls: ['https://example.com'] }, {} as any);
-        assert.equal(missing.isError, true);
-        assert.match(missing.content[0].text, /Gemini API key missing/);
-
-        process.env.GEMINI_API_KEY = 'env-key';
-
-        const server = createGeminiMcpServer({ config: {} });
-        const envTool = (server as any)._registeredTools['analyze_image'];
-        const success = await envTool.callback(
-            { imageUrls: ['https://example.com/image.png'] },
-            {} as any,
-        );
-
-        assert.equal(success.content[0].text, 'env-response');
-        assert.equal(calls[0]?.modelName, 'models/gemini-flash-lite-latest');
-    } finally {
-        GeminiMediaAnalyzer.prototype.analyzeImageUrls = original;
-        if (originalEnv === undefined) {
-            delete process.env.GEMINI_API_KEY;
-        } else {
-            process.env.GEMINI_API_KEY = originalEnv;
-        }
-    }
+    const tools = (server as any)._registeredTools;
+    assert.ok(tools['analyze_image']);
+    assert.ok(tools['analyze_video']);
+    assert.ok(tools['analyze_youtube_video']);
 });

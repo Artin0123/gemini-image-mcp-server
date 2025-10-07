@@ -47,7 +47,7 @@ Most MCP clients let you inject these values directly in their configuration. Ex
       "args": ["/absolute/path/to/image-mcp-server-gemini/dist/index.js"],
       "env": {
         "GEMINI_API_KEY": "your_api_key_here",
-        "MCP_GEMINI_MODEL": "models/gemini-flash-lite-latest"
+        "GEMINI_MODEL": "models/gemini-flash-lite-latest"
       }
     }
   }
@@ -60,7 +60,7 @@ If no key is supplied, the server can still start (handy for automated scans), b
 
 The server defaults to `models/gemini-flash-lite-latest`. Override it by either:
 
-> Setting the `MCP_GEMINI_MODEL` environment variable, or Providing `modelName` in the Smithery/SDK configuration schema.
+> Setting the `GEMINI_MODEL` environment variable, or Providing `modelName` in the Smithery/SDK configuration schema.
 
 ## Available tools
 

@@ -1,11 +1,10 @@
 import { GoogleGenAI, Content, Part } from '@google/genai';
 
 export type UrlImageSource = { type: 'url'; data: string };
-export type Base64ImageSource = { type: 'base64'; data: string; mimeType?: string };
 export type UrlVideoSource = { type: 'url'; data: string };
 export type YouTubeVideoSource = { type: 'youtube'; data: string };
 
-export type ImageSource = UrlImageSource | Base64ImageSource;
+export type ImageSource = UrlImageSource;
 export type VideoSource = UrlVideoSource | YouTubeVideoSource;
 
 const DEFAULT_IMAGE_PROMPT =
@@ -23,15 +22,6 @@ const IMAGE_EXTENSION_TO_MIME = new Map<string, string>([
     ['.png', 'image/png'],
     ['.svg', 'image/svg+xml'],
     ['.webp', 'image/webp'],
-]);
-const VIDEO_EXTENSION_TO_MIME = new Map<string, string>([
-    ['.avi', 'video/x-msvideo'],
-    ['.mkv', 'video/x-matroska'],
-    ['.mov', 'video/quicktime'],
-    ['.mp4', 'video/mp4'],
-    ['.mpeg', 'video/mpeg'],
-    ['.mpg', 'video/mpeg'],
-    ['.webm', 'video/webm'],
 ]);
 
 export class GeminiMediaAnalyzer {
@@ -160,27 +150,38 @@ export class GeminiMediaAnalyzer {
                 return null;
             }
 
-            return {
-                fileData: {
-                    fileUri: source.data,
-                    mimeType: detectImageMimeType(source.data),
-                },
-            } satisfies Part;
-        }
+            console.log(`Fetching image from URL: ${source.data}`);
+            try {
+                // 使用 fetch 下載圖片
+                const response = await fetch(source.data);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-        if (source.type === 'base64') {
-            const normalized = normalizeBase64Source(source);
-            if (!normalized) {
-                console.warn(`Skipping invalid base64 image at index ${index}.`);
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+
+                // 獲取 MIME type
+                const mimeType = response.headers.get('content-type')?.split(';')[0] ||
+                    detectImageMimeType(source.data);
+
+                if (!mimeType.startsWith('image/')) {
+                    console.warn(`Skipping non-image content from URL ${source.data}: ${mimeType}`);
+                    return null;
+                }
+
+                // 轉換為 base64 並使用 inlineData
+                const base64Data = buffer.toString('base64');
+                return {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType,
+                    },
+                } satisfies Part;
+            } catch (error) {
+                console.error(`Failed to fetch image URL: ${error instanceof Error ? error.message : String(error)}`);
                 return null;
             }
-
-            return {
-                inlineData: {
-                    data: normalized.data,
-                    mimeType: normalized.mimeType,
-                },
-            } satisfies Part;
         }
 
         console.warn(`Ignoring unsupported image source type at index ${index}.`);
@@ -194,6 +195,7 @@ export class GeminiMediaAnalyzer {
                 return null;
             }
 
+            // YouTube URL 可以直接使用 fileData
             return {
                 fileData: {
                     fileUri: source.data,
@@ -207,17 +209,9 @@ export class GeminiMediaAnalyzer {
             return null;
         }
 
-        if (!isValidHttpUrl(source.data)) {
-            console.warn(`Skipping invalid video URL at index ${index}: ${source.data}`);
-            return null;
-        }
-
-        return {
-            fileData: {
-                fileUri: source.data,
-                mimeType: detectVideoMimeType(source.data),
-            },
-        } satisfies Part;
+        // 普通 HTTP URL 視頻目前不支援(需要 Files API 上傳)
+        console.warn(`HTTP URL videos are not supported. Only YouTube URLs are supported for videos. Skipping: ${source.data}`);
+        return null;
     }
 }
 
@@ -231,16 +225,7 @@ function isValidHttpUrl(candidate: string): boolean {
 }
 
 function detectImageMimeType(value: string): string {
-    const fromDataUrl = extractMimeTypeFromDataUrl(value);
-    if (fromDataUrl) {
-        return fromDataUrl;
-    }
-
     return detectMimeTypeFromUrl(value, IMAGE_EXTENSION_TO_MIME, IMAGE_MIME_FALLBACK);
-}
-
-function detectVideoMimeType(value: string): string {
-    return detectMimeTypeFromUrl(value, VIDEO_EXTENSION_TO_MIME, VIDEO_MIME_FALLBACK);
 }
 
 function detectMimeTypeFromUrl(
@@ -271,36 +256,6 @@ function detectMimeTypeFromUrl(
     }
 
     return fallback;
-}
-
-function extractMimeTypeFromDataUrl(value: string): string | null {
-    const match = value.match(/^data:(?<mime>[^;,]+);base64,/i);
-    return match?.groups?.mime ?? null;
-}
-
-function normalizeBase64Source(source: Base64ImageSource): { data: string; mimeType: string } | null {
-    const trimmed = source.data.trim();
-    if (!trimmed) {
-        return null;
-    }
-
-    const dataUrlMatch = trimmed.match(/^data:(?<mime>[^;,]+);base64,(?<payload>[a-z0-9+/=\s-]+)$/i);
-    if (dataUrlMatch?.groups?.payload) {
-        return {
-            data: dataUrlMatch.groups.payload.replace(/\s+/g, ''),
-            mimeType: source.mimeType ?? dataUrlMatch.groups.mime ?? IMAGE_MIME_FALLBACK,
-        };
-    }
-
-    const sanitized = trimmed.replace(/\s+/g, '');
-    if (!/^[a-z0-9+/=]+$/i.test(sanitized)) {
-        return null;
-    }
-
-    return {
-        data: sanitized,
-        mimeType: source.mimeType ?? IMAGE_MIME_FALLBACK,
-    };
 }
 
 function extractText(response: any, isVideo = false): string {
@@ -336,4 +291,3 @@ function extractText(response: any, isVideo = false): string {
 
     return text;
 }
-

@@ -12,7 +12,7 @@ import {
 } from './server-config.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
-const TOOL_NAMES = ['analyze_image', 'analyze_video', 'analyze_youtube_video'] as const;
+const TOOL_NAMES = ['analyze_image', 'analyze_video', 'analyze_youtube'] as const;
 type ToolName = (typeof TOOL_NAMES)[number];
 
 export const configSchema = z
@@ -154,7 +154,7 @@ function registerImageUrlTool(
   server.registerTool(
     'analyze_image',
     {
-      title: 'Analyze Image (URL)',
+      title: 'Analyze URL Image',
       description: 'Analyzes images available via URLs using Gemini API.',
       inputSchema: AnalyzeImageSchema.shape,
       annotations: {
@@ -178,8 +178,8 @@ function registerVideoUrlTool(
   server.registerTool(
     'analyze_video',
     {
-      title: 'Analyze Video (URL)',
-      description: 'Analyzes videos accessible via URLs using Gemini API.',
+      title: 'Analyze URL Video',
+      description: 'Analyzes videos from URLs using Gemini API. Currently only YouTube URLs are supported.',
       inputSchema: AnalyzeVideoSchema.shape,
       annotations: {
         readOnlyHint: true,
@@ -200,7 +200,7 @@ function registerYouTubeTool(
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
   server.registerTool(
-    'analyze_youtube_video',
+    'analyze_youtube',
     {
       title: 'Analyze YouTube Video',
       description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
@@ -211,7 +211,7 @@ function registerYouTubeTool(
       },
     },
     async (rawArgs: unknown) =>
-      executeTool('analyze_youtube_video', async () => {
+      executeTool('analyze_youtube', async () => {
         const { youtubeUrl, prompt } = AnalyzeYouTubeSchema.parse(rawArgs);
         const analyzer = getAnalyzer();
         return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
