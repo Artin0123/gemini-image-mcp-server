@@ -35,7 +35,7 @@ npm run build
 
 ## Configuration
 
-Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide `GEMINI_API_KEY` it to the server.
+Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide `GEMINI_API_KEY` to the server.
 
 Most MCP clients let you inject these values directly in their configuration. Example Smithery entry:
 

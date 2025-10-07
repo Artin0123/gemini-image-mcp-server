@@ -1,6 +1,6 @@
 {
   "name": "gemini-image-mcp-server",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "MCP server for image and video analysis powered by Gemini API.",
   "main": "dist/index.js",
   "module": "./src/index.ts",
@@ -23,7 +23,7 @@
   "bugs": {
     "url": "https://github.com/Artin0123/image-mcp-server-gemini/issues"
   },
-  "homepage": "https://github.com/Artin0123/image-mcp-server-gemini#readme",
+  "homepage": "https://github.com/Artin0123/gemini-image-mcp-server/tree/remote#readme",
   "dependencies": {
     "@google/genai": "^1.22.0",
     "@modelcontextprotocol/sdk": "^1.19.1",

@@ -120,75 +120,66 @@ function registerImageUrlTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server
-    .tool(
-      'analyze_image',
-      {
-        title: 'Analyze Image (URL)',
-        description: 'Analyzes images available via URLs using Gemini API.',
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-      async (args) =>
-        executeTool('analyze_image', async () => {
-          const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(args);
-          const analyzer = getAnalyzer();
-          return analyzer.analyzeImageUrls(imageUrls, prompt);
-        }),
-    )
-    .update({
-      paramsSchema: AnalyzeImageParamsSchema as any,
-    });
+  server.tool(
+    'analyze_image',
+    {
+      title: 'Analyze Image (URL)',
+      description: 'Analyzes images available via URLs using Gemini API.',
+      readOnlyHint: true,
+      idempotentHint: true,
+      inputSchema: AnalyzeImageParamsSchema,
+    },
+    async (args) =>
+      executeTool('analyze_image', async () => {
+        const { imageUrls, prompt } = AnalyzeImageArgsSchema.parse(args);
+        const analyzer = getAnalyzer();
+        return analyzer.analyzeImageUrls(imageUrls, prompt);
+      }),
+  );
 }
 
 function registerVideoUrlTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server
-    .tool(
-      'analyze_video',
-      {
-        title: 'Analyze Video (URL)',
-        description: 'Analyzes videos accessible via URLs using Gemini API.',
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-      async (args) =>
-        executeTool('analyze_video', async () => {
-          const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(args);
-          const analyzer = getAnalyzer();
-          return analyzer.analyzeVideoUrls(videoUrls, prompt);
-        }),
-    )
-    .update({
-      paramsSchema: AnalyzeVideoParamsSchema as any,
-    });
+  server.tool(
+    'analyze_video',
+    {
+      title: 'Analyze Video (URL)',
+      description: 'Analyzes videos accessible via URLs using Gemini API.',
+      readOnlyHint: true,
+      idempotentHint: true,
+      inputSchema: AnalyzeVideoParamsSchema,
+    },
+    async (args) =>
+      executeTool('analyze_video', async () => {
+        const { videoUrls, prompt } = AnalyzeVideoArgsSchema.parse(args);
+        const analyzer = getAnalyzer();
+        return analyzer.analyzeVideoUrls(videoUrls, prompt);
+      }),
+  );
 }
 
 function registerYouTubeTool(
   server: McpServer,
   getAnalyzer: () => GeminiMediaAnalyzer,
 ) {
-  server
-    .tool(
-      'analyze_youtube_video',
-      {
-        title: 'Analyze YouTube Video',
-        description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-      async (args) =>
-        executeTool('analyze_youtube_video', async () => {
-          const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(args);
-          const analyzer = getAnalyzer();
-          return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
-        }),
-    )
-    .update({
-      paramsSchema: AnalyzeYouTubeParamsSchema as any,
-    });
+  server.tool(
+    'analyze_youtube_video',
+    {
+      title: 'Analyze YouTube Video',
+      description: 'Analyzes a video directly from a YouTube URL using Gemini API.',
+      readOnlyHint: true,
+      idempotentHint: true,
+      inputSchema: AnalyzeYouTubeParamsSchema,
+    },
+    async (args) =>
+      executeTool('analyze_youtube_video', async () => {
+        const { youtubeUrl, prompt } = AnalyzeYouTubeArgsSchema.parse(args);
+        const analyzer = getAnalyzer();
+        return analyzer.analyzeYouTubeVideo(youtubeUrl, prompt);
+      }),
+  );
 }
 
 async function executeTool(
