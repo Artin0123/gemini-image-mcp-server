@@ -2,8 +2,8 @@ export type ServerOptions = {
     modelName: string;
 };
 
-export const SERVER_VERSION = '1.3.3';
-export const DEFAULT_MODEL_NAME = 'gemini-flash-lite-latest';
+export const SERVER_VERSION = '1.3.4';
+export const DEFAULT_MODEL_NAME = 'models/gemini-flash-lite-latest';
 export const MODEL_ENV_VAR = 'MCP_GEMINI_MODEL';
 
 export function loadServerOptions(env: NodeJS.ProcessEnv): ServerOptions {
@@ -11,11 +11,20 @@ export function loadServerOptions(env: NodeJS.ProcessEnv): ServerOptions {
 
     const modelName =
         typeof modelCandidate === 'string' && modelCandidate.trim().length > 0
-            ? modelCandidate.trim()
+            ? normalizeModelName(modelCandidate)
             : DEFAULT_MODEL_NAME;
 
     return {
         modelName,
     };
+}
+
+export function normalizeModelName(candidate: string): string {
+    const trimmed = candidate.trim();
+    if (trimmed.length === 0) {
+        return DEFAULT_MODEL_NAME;
+    }
+
+    return trimmed.startsWith('models/') ? trimmed : `models/${trimmed}`;
 }
 

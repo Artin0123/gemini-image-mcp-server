@@ -47,7 +47,7 @@ Most MCP clients let you inject these values directly in their configuration. Ex
       "args": ["/absolute/path/to/image-mcp-server-gemini/dist/index.js"],
       "env": {
         "GEMINI_API_KEY": "your_api_key_here",
-        "MCP_GEMINI_MODEL": "gemini-flash-lite-latest"
+        "MCP_GEMINI_MODEL": "models/gemini-flash-lite-latest"
       }
     }
   }
@@ -58,7 +58,7 @@ If no key is supplied, the server can still start (handy for automated scans), b
 
 ### Model override
 
-The server defaults to `gemini-flash-lite-latest`. Override it by either:
+The server defaults to `models/gemini-flash-lite-latest`. Override it by either:
 
 > Setting the `MCP_GEMINI_MODEL` environment variable, or Providing `modelName` in the Smithery/SDK configuration schema.
 
@@ -68,7 +68,7 @@ The server defaults to `gemini-flash-lite-latest`. Override it by either:
 - `analyze_video`: Analyze one or more video URLs.
 - `analyze_youtube_video`: Analyze a single YouTube video URL.
 
-All tools treat URLs as remote references and forward them directly to Gemini using wildcard MIME types (`image/*` or `video/*`). No files are downloaded or uploaded by this server.
+All tools treat URLs as remote references and forward them directly to Gemini, inferring MIME types from file extensions (falling back to `image/*` or `video/*` when unknown). No files are downloaded or uploaded by this server.
 
 ### Prompt examples
 

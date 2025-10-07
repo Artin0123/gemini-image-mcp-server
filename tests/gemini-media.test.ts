@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { GeminiMediaAnalyzer } from '../src/gemini-media.js';
 
 const noop = () => { };
@@ -47,7 +48,7 @@ test('analyzeImageUrls forwards URL references to Gemini', async () => {
         assert.equal(firstContent?.parts?.[0]?.text, 'describe image');
         const filePart = firstContent?.parts?.[1];
         assert.equal(filePart?.fileData?.fileUri, remoteUrl);
-        assert.equal(filePart?.fileData?.mimeType, 'image/*');
+        assert.equal(filePart?.fileData?.mimeType, 'image/png');
     } finally {
         console.log = originalLog;
     }
@@ -69,7 +70,38 @@ test('analyzeVideoUrls forwards URL references with inferred MIME types', async 
         const firstContent = fake.contents?.[0];
         const filePart = firstContent?.parts?.[1];
         assert.equal(filePart?.fileData?.fileUri, remoteUrl);
-        assert.equal(filePart?.fileData?.mimeType, 'video/*');
+        assert.equal(filePart?.fileData?.mimeType, 'video/mp4');
+    } finally {
+        console.log = originalLog;
+    }
+});
+
+test('analyzeImages supports base64 image sources with inferred MIME types', async () => {
+    const base64Payload = Buffer.from('hello world').toString('base64');
+    const dataUrl = `data:image/jpeg;base64,${base64Payload}`;
+    const fake = createFakeClient();
+    const analyzer = new GeminiMediaAnalyzer(fake.client as any, 'image-model');
+    const originalLog = console.log;
+
+    try {
+        console.log = noop;
+
+        const result = await analyzer.analyzeImages(
+            [
+                { type: 'base64', data: base64Payload, mimeType: 'image/gif' },
+                { type: 'base64', data: dataUrl },
+            ],
+            'describe image',
+        );
+
+        assert.equal(result, 'ok');
+        const firstContent = fake.contents?.[0];
+        const inlinePartA = firstContent?.parts?.[1];
+        const inlinePartB = firstContent?.parts?.[2];
+        assert.equal(inlinePartA?.inlineData?.mimeType, 'image/gif');
+        assert.equal(inlinePartA?.inlineData?.data, base64Payload);
+        assert.equal(inlinePartB?.inlineData?.mimeType, 'image/jpeg');
+        assert.equal(inlinePartB?.inlineData?.data, base64Payload);
     } finally {
         console.log = originalLog;
     }

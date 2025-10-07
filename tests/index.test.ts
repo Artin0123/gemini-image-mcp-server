@@ -30,7 +30,8 @@ test('createGeminiMcpServer exposes configuration schema metadata', () => {
             },
             modelName: {
                 type: 'string',
-                description: 'Optional Gemini model name override. Defaults to gemini-flash-lite-latest.',
+                description:
+                    'Optional Gemini model name override. Defaults to models/gemini-flash-lite-latest.',
             },
         },
         required: [],
@@ -65,7 +66,7 @@ test('analyze_image tool enforces schema and uses provided config', async () => 
         assert.equal(success.content[0].text, 'stubbed-response');
         assert.deepEqual(calls[0]?.urls, ['https://example.com/image.png']);
         assert.equal(calls[0]?.prompt, 'describe image');
-        assert.equal(calls[0]?.modelName, 'gemini-pro-vision');
+        assert.equal(calls[0]?.modelName, 'models/gemini-pro-vision');
 
         const invalid = await tool.callback({ imageUrls: [] }, {} as any);
         assert.equal(invalid.isError, true);
@@ -104,7 +105,7 @@ test('analyze_image tool requires API key and falls back to environment', async 
         );
 
         assert.equal(success.content[0].text, 'env-response');
-        assert.equal(calls[0]?.modelName, 'gemini-flash-lite-latest');
+        assert.equal(calls[0]?.modelName, 'models/gemini-flash-lite-latest');
     } finally {
         GeminiMediaAnalyzer.prototype.analyzeImageUrls = original;
         if (originalEnv === undefined) {

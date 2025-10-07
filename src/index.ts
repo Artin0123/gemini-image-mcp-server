@@ -8,6 +8,7 @@ import {
 import {
   SERVER_VERSION,
   loadServerOptions,
+  normalizeModelName,
 } from './server-config.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
@@ -29,7 +30,9 @@ export const configSchema = z
       .trim()
       .min(1, 'Model name cannot be empty.')
       .optional()
-      .describe('Optional Gemini model name override. Defaults to gemini-flash-lite-latest.'),
+      .describe(
+        'Optional Gemini model name override. Defaults to models/gemini-flash-lite-latest.',
+      ),
   })
   .passthrough();
 
@@ -44,7 +47,7 @@ const configJsonSchema = {
     },
     modelName: {
       type: 'string',
-      description: 'Optional Gemini model name override. Defaults to gemini-flash-lite-latest.',
+      description: 'Optional Gemini model name override. Defaults to models/gemini-flash-lite-latest.',
     },
   },
   required: [],
@@ -95,7 +98,10 @@ type AnalyzeYouTubeArgs = z.infer<typeof AnalyzeYouTubeSchema>;
 export function createGeminiMcpServer({ config, logger }: CreateServerArgs = {}): McpServer {
   const normalizedConfig = configSchema.parse(config ?? {});
   const baseOptions = loadServerOptions(process.env);
-  const modelName = normalizedConfig.modelName ?? baseOptions.modelName;
+  const modelName =
+    normalizedConfig.modelName !== undefined
+      ? normalizeModelName(normalizedConfig.modelName)
+      : baseOptions.modelName;
   const resolveGeminiApiKey = () =>
     normalizedConfig.geminiApiKey ?? process.env.GEMINI_API_KEY?.trim();
 

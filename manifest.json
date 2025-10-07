@@ -13,7 +13,7 @@
                 },
                 "modelName": {
                     "type": "string",
-                    "description": "Optional Gemini model name override. Defaults to gemini-flash-lite-latest."
+                    "description": "Optional Gemini model name override. Defaults to models/gemini-flash-lite-latest."
                 }
             },
             "required": []
