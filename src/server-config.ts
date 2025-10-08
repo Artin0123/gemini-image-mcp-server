@@ -2,7 +2,7 @@ export type ServerOptions = {
     modelName: string;
 };
 
-export const SERVER_VERSION = '1.4.3';
+export const SERVER_VERSION = '1.5.0';
 export const DEFAULT_MODEL_NAME = 'models/gemini-flash-lite-latest';
 export const MODEL_ENV_VAR = 'GEMINI_MODEL';
 

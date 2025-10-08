@@ -1,10 +1,14 @@
 import { GoogleGenAI, Content, Part } from '@google/genai';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 
 export type UrlImageSource = { type: 'url'; data: string };
+export type LocalImageSource = { type: 'local'; data: string };
 export type YouTubeVideoSource = { type: 'youtube'; data: string };
+export type LocalVideoSource = { type: 'local'; data: string };
 
-export type ImageSource = UrlImageSource;
-export type VideoSource = YouTubeVideoSource;
+export type ImageSource = UrlImageSource | LocalImageSource;
+export type VideoSource = YouTubeVideoSource | LocalVideoSource;
 
 const DEFAULT_IMAGE_PROMPT =
     'Analyze the image content in detail and provide an explanation.';
@@ -23,6 +27,18 @@ const IMAGE_EXTENSION_TO_MIME = new Map<string, string>([
     ['.png', 'image/png'],
     ['.svg', 'image/svg+xml'],
     ['.webp', 'image/webp'],
+]);
+const VIDEO_EXTENSION_TO_MIME = new Map<string, string>([
+    ['.mp4', 'video/mp4'],
+    ['.mpeg', 'video/mpeg'],
+    ['.mpg', 'video/mpeg'],
+    ['.mov', 'video/quicktime'],
+    ['.avi', 'video/x-msvideo'],
+    ['.flv', 'video/x-flv'],
+    ['.webm', 'video/webm'],
+    ['.wmv', 'video/x-ms-wmv'],
+    ['.3gp', 'video/3gpp'],
+    ['.ogv', 'video/ogg'],
 ]);
 
 export class GeminiMediaAnalyzer {
@@ -43,6 +59,18 @@ export class GeminiMediaAnalyzer {
         return this.analyzeImages(sources, promptText);
     }
 
+    async analyzeLocalImages(
+        imagePaths: string[],
+        promptText: string = DEFAULT_IMAGE_PROMPT,
+    ): Promise<string> {
+        if (!Array.isArray(imagePaths) || imagePaths.length === 0) {
+            throw new Error('No image paths provided.');
+        }
+
+        const sources: ImageSource[] = imagePaths.map((data) => ({ type: 'local', data }));
+        return this.analyzeImages(sources, promptText);
+    }
+
     async analyzeYouTubeVideo(
         youtubeUrl: string,
         promptText: string = DEFAULT_VIDEO_PROMPT,
@@ -52,6 +80,18 @@ export class GeminiMediaAnalyzer {
         }
 
         return this.analyzeVideos([{ type: 'youtube', data: youtubeUrl }], promptText);
+    }
+
+    async analyzeLocalVideos(
+        videoPaths: string[],
+        promptText: string = DEFAULT_VIDEO_PROMPT,
+    ): Promise<string> {
+        if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+            throw new Error('No video paths provided.');
+        }
+
+        const sources: VideoSource[] = videoPaths.map((data) => ({ type: 'local', data }));
+        return this.analyzeVideos(sources, promptText);
     }
 
     async analyzeImages(
@@ -191,6 +231,53 @@ export class GeminiMediaAnalyzer {
             }
         }
 
+        if (source.type === 'local') {
+            console.log(`Reading local image file: ${source.data}`);
+            try {
+                // 驗證是絕對路徑
+                if (!path.isAbsolute(source.data)) {
+                    throw new Error(`Image path must be absolute. Received: ${source.data}`);
+                }
+
+                // 讀取檔案
+                const buffer = await fs.readFile(source.data);
+
+                // 檢查檔案大小
+                const fileSizeMB = buffer.length / (1024 * 1024);
+                if (buffer.length > MAX_FILE_SIZE_BYTES) {
+                    const errorMsg = `Image size ${fileSizeMB.toFixed(2)} MB exceeds maximum allowed size of ${MAX_FILE_SIZE_MB} MB`;
+                    console.warn(`Skipping large image file: ${source.data}`);
+                    throw new Error(errorMsg);
+                }
+
+                // 從副檔名判斷 MIME type
+                const ext = path.extname(source.data).toLowerCase();
+                const mimeType = IMAGE_EXTENSION_TO_MIME.get(ext) || IMAGE_MIME_FALLBACK;
+
+                console.log(`Local image loaded: ${fileSizeMB.toFixed(2)} MB (${mimeType})`);
+
+                // 轉換為 base64 並使用 inlineData
+                const base64Data = buffer.toString('base64');
+                return {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType,
+                    },
+                } satisfies Part;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+
+                // 如果是檔案大小超限錯誤,重新拋出讓用戶看到
+                if (errorMessage.includes('exceeds maximum allowed size')) {
+                    throw error;
+                }
+
+                // 其他錯誤記錄後返回 null
+                console.error(`Failed to read local image file: ${errorMessage}`);
+                return null;
+            }
+        }
+
         console.warn(`Ignoring unsupported image source type at index ${index}.`);
         return null;
     }
@@ -210,6 +297,53 @@ export class GeminiMediaAnalyzer {
             } satisfies Part;
         }
 
+        if (source.type === 'local') {
+            console.log(`Reading local video file: ${source.data}`);
+            try {
+                // 驗證是絕對路徑
+                if (!path.isAbsolute(source.data)) {
+                    throw new Error(`Video path must be absolute. Received: ${source.data}`);
+                }
+
+                // 讀取檔案
+                const buffer = await fs.readFile(source.data);
+
+                // 檢查檔案大小（影片也限制在 16MB 以內）
+                const fileSizeMB = buffer.length / (1024 * 1024);
+                if (buffer.length > MAX_FILE_SIZE_BYTES) {
+                    const errorMsg = `Video size ${fileSizeMB.toFixed(2)} MB exceeds maximum allowed size of ${MAX_FILE_SIZE_MB} MB`;
+                    console.warn(`Skipping large video file: ${source.data}`);
+                    throw new Error(errorMsg);
+                }
+
+                // 從副檔名判斷 MIME type
+                const ext = path.extname(source.data).toLowerCase();
+                const mimeType = VIDEO_EXTENSION_TO_MIME.get(ext) || VIDEO_MIME_FALLBACK;
+
+                console.log(`Local video loaded: ${fileSizeMB.toFixed(2)} MB (${mimeType})`);
+
+                // 轉換為 base64 並使用 inlineData
+                const base64Data = buffer.toString('base64');
+                return {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType,
+                    },
+                } satisfies Part;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+
+                // 如果是檔案大小超限錯誤,重新拋出讓用戶看到
+                if (errorMessage.includes('exceeds maximum allowed size')) {
+                    throw error;
+                }
+
+                // 其他錯誤記錄後返回 null
+                console.error(`Failed to read local video file: ${errorMessage}`);
+                return null;
+            }
+        }
+
         console.warn(`Ignoring unsupported video source type at index ${index}.`);
         return null;
     }
@@ -226,6 +360,10 @@ function isValidHttpUrl(candidate: string): boolean {
 
 function detectImageMimeType(value: string): string {
     return detectMimeTypeFromUrl(value, IMAGE_EXTENSION_TO_MIME, IMAGE_MIME_FALLBACK);
+}
+
+function detectVideoMimeType(value: string): string {
+    return detectMimeTypeFromUrl(value, VIDEO_EXTENSION_TO_MIME, VIDEO_MIME_FALLBACK);
 }
 
 function detectMimeTypeFromUrl(

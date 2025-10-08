@@ -1,15 +1,14 @@
-# image-mcp-server-gemini
-
-[![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
-
-> This is remote server, use [local version](https://github.com/Artin0123/gemini-vision-mcp/tree/local) for local images and videos.
+# gemini-vision-mcp
+> This version supports both remote URLs and local file paths for image and video analysis.
 
 ## Features
 
 - Analyze one or more image URLs with a single tool call.
+- Analyze local images using absolute file paths.
 - Analyze YouTube videos without downloading files locally.
+- Analyze local videos using absolute file paths.
 - Supply an API key and optionally override the Gemini model via environment variables.
-- **File size limit**: Images are limited to 16 MB to ensure fast processing.
+- **File size limit**: Images and videos are limited to 16 MB to ensure fast processing.
 - **YouTube videos**: No size limit as they are streamed directly by Gemini API.
 
 ## Installation
@@ -66,20 +65,44 @@ The server defaults to `models/gemini-flash-lite-latest`. Override it by either:
 ## Available tools
 
 - `analyze_image`: Analyze one or more image URLs. **Maximum file size: 16 MB per image.**
+- `analyze_local_image`: Analyze one or more local images using absolute file paths. **Maximum file size: 16 MB per image.**
 - `analyze_youtube_video`: Analyze a YouTube video from URL. No size limit.
+- `analyze_local_video`: Analyze one or more local videos using absolute file paths. **Maximum file size: 16 MB per video.**
 
-Image URLs are downloaded and processed with a 16 MB size limit to ensure fast response times. Files exceeding this limit will result in an error message indicating the actual file size.
+Image and video URLs are downloaded and processed with a 16 MB size limit to ensure fast response times. Files exceeding this limit will result in an error message indicating the actual file size.
 
 YouTube videos are streamed directly by Gemini API without downloading, so there is no size restriction.
 
+### Important Notes for Local Files
+
+When using `analyze_local_image` or `analyze_local_video`, relative paths will cause path resolution issues, tested on Windows only.
+
+**Examples:**
+- ✅ **Correct**: `C:\\Users\\username\\Documents\\image.png`
+- ✅ **Correct**: `/home/username/documents/image.png` (Linux/Mac)
+- ❌ **Wrong**: `./image.png`
+- ❌ **Wrong**: `image.png`
+
 ### Prompt examples
 
+**URL Images:**
 ```
 Please analyze this product photo: https://teimg-bgr.pages.dev/file/mvYT6KeF.webp
 ```
 
+**Local Images:**
+```
+@photo.jpg Analyze this image.
+```
+
+**YouTube Videos:**
 ```
 Extract the main talking points from this clip: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+**Local Videos:**
+```
+@recording.mp4 Analyze this video.
 ```
 
 ## Development
