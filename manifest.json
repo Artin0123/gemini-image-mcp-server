@@ -1,6 +1,6 @@
 {
     "name": "gemini-image-mcp-server",
-    "version": "1.4.4",
+    "version": "1.4.5",
     "description": "Analyze images and videos with Gemini API.",
     "configuration": {
         "schema": {
