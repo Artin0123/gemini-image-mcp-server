@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import {
   GeminiMediaAnalyzer,
 } from './gemini-media.js';
@@ -226,4 +229,44 @@ function createErrorResponse(toolName: ToolName, error: unknown) {
     isError: true as const,
     errorCode: error instanceof McpError ? error.code : ErrorCode.InternalError,
   };
+}
+
+function isExecutedDirectly(): boolean {
+  const entryPoint = process.argv[1];
+  if (!entryPoint) {
+    return false;
+  }
+
+  try {
+    const resolvedEntry = path.resolve(entryPoint);
+    const currentModulePath = fileURLToPath(import.meta.url);
+    return resolvedEntry === currentModulePath;
+  } catch {
+    return false;
+  }
+}
+
+async function startCliServer(): Promise<void> {
+  try {
+    const envApiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!envApiKey) {
+      console.error('GEMINI_API_KEY is required when running the MCP server directly.');
+      process.exit(1);
+    }
+
+    const server = createGeminiMcpServer({
+      config: { geminiApiKey: envApiKey },
+      logger: console,
+    });
+
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  } catch (error) {
+    console.error('Failed to start Gemini MCP server:', error);
+    process.exit(1);
+  }
+}
+
+if (isExecutedDirectly()) {
+  void startCliServer();
 }
