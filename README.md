@@ -19,7 +19,7 @@
 Install the server in Claude Desktop:
 
 ```bash
-npx -y @smithery/cli install @Artin0123/gemini-image-mcp-server --client claude
+npx -y @smithery/cli install @Artin0123/gemini-image-mcp-server
 ```
 
 ### Manual Installation
