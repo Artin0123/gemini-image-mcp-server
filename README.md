@@ -2,19 +2,21 @@
 
 [![smithery badge](https://smithery.ai/badge/@Artin0123/gemini-image-mcp-server)](https://smithery.ai/server/@Artin0123/gemini-image-mcp-server)
 
+> This is remote server, use [local version](https://github.com/Artin0123/gemini-vision-mcp/tree/local) for local images and videos.
+
 ## Features
 
 - Analyze one or more image URLs with a single tool call.
 - Analyze YouTube videos without downloading files locally.
-- Simple configuration: supply an API key and optionally override the Gemini model via a single environment variable.
-- **File size limit**: Images are limited to 10 MB to ensure fast processing.
+- Supply an API key and optionally override the Gemini model via environment variables.
+- **File size limit**: Images are limited to 16 MB to ensure fast processing.
 - **YouTube videos**: No size limit as they are streamed directly by Gemini API.
 
 ## Installation
 
 ### Installing via Smithery
 
-Install the server in Claude Desktop (or any Smithery-compatible client) with:
+Install the server in Claude Desktop:
 
 ```bash
 npx -y @smithery/cli install @Artin0123/gemini-image-mcp-server --client claude
@@ -37,8 +39,6 @@ npm run build
 ## Configuration
 
 Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and provide `GEMINI_API_KEY` to the server.
-
-Most MCP clients let you inject these values directly in their configuration:
 
 ```json
 {
@@ -65,10 +65,10 @@ The server defaults to `models/gemini-flash-lite-latest`. Override it by either:
 
 ## Available tools
 
-- `analyze_image`: Analyze one or more image URLs. **Maximum file size: 10 MB per image.**
+- `analyze_image`: Analyze one or more image URLs. **Maximum file size: 16 MB per image.**
 - `analyze_youtube_video`: Analyze a YouTube video from URL. No size limit.
 
-Image URLs are downloaded and processed with a 10 MB size limit to ensure fast response times. Files exceeding this limit will result in an error message indicating the actual file size.
+Image URLs are downloaded and processed with a 16 MB size limit to ensure fast response times. Files exceeding this limit will result in an error message indicating the actual file size.
 
 YouTube videos are streamed directly by Gemini API without downloading, so there is no size restriction.
 

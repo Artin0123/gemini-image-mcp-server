@@ -12,7 +12,7 @@ const DEFAULT_VIDEO_PROMPT =
     'Analyze the video content in detail and provide an explanation.';
 const IMAGE_MIME_FALLBACK = 'image/*';
 const VIDEO_MIME_FALLBACK = 'video/*';
-const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_MB = 16;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const IMAGE_EXTENSION_TO_MIME = new Map<string, string>([
     ['.apng', 'image/apng'],
