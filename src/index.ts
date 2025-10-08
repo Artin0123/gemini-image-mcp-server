@@ -144,7 +144,7 @@ function registerImageUrlTool(
     'analyze_image',
     {
       title: 'Analyze URL Image',
-      description: 'Analyzes images available via URLs using Gemini API. Maximum file size: 10 MB.',
+      description: 'Analyzes images available via URLs using Gemini API. Maximum file size: 16 MB.',
       inputSchema: AnalyzeImageSchema.shape,
       annotations: {
         readOnlyHint: true,
